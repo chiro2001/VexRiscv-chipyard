@@ -13,11 +13,10 @@ package vexriscv.chipyard
 
 import chisel3._
 import chisel3.util._
-import spinal.core.{ClockDomain, IntToBuilder, SpinalVerilog}
-import spinal.core.fiber.Handle.initImplicit
-import vexriscv.plugin._
-import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig}
-import vexriscv.{VexRiscv => VR, VexRiscvConfig, plugin}
+import spinal.core.SpinalConfig
+import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
+
+import scala.tools.nsc.io.File
 
 trait VexRiscvCoreIOIMem extends Bundle {
   // Instruction Memory Interface
@@ -162,95 +161,28 @@ class VexRiscvCoreIO extends Bundle
   with VexRiscvCoreIOIMem
   with VexRiscvCoreIODMem
 
-class VexRiscv
+class VexAXICore
   extends BlackBox
     // with HasBlackBoxResource
     with HasBlackBoxPath {
   val io = IO(new VexRiscvCoreIO)
 
-  def config = VexRiscvConfig(
-    plugins = List(
-      new IBusCachedPlugin(
-        prediction = DYNAMIC,
-        config = InstructionCacheConfig(
-          cacheSize = 4096,
-          bytePerLine = 32,
-          wayCount = 1,
-          addressWidth = 32,
-          cpuDataWidth = 32,
-          memDataWidth = 32,
-          catchIllegalAccess = true,
-          catchAccessFault = true,
-          asyncTagMemory = false,
-          twoCycleRam = true,
-          twoCycleCache = true
-        ),
-        memoryTranslatorPortConfig = MmuPortConfig(
-          portTlbSize = 4
-        )
-      ),
-      new DBusCachedPlugin(
-        config = new DataCacheConfig(
-          cacheSize = 4096,
-          bytePerLine = 32,
-          wayCount = 1,
-          addressWidth = 32,
-          cpuDataWidth = 32,
-          memDataWidth = 32,
-          catchAccessError = true,
-          catchIllegal = true,
-          catchUnaligned = true
-        ),
-        memoryTranslatorPortConfig = MmuPortConfig(
-          portTlbSize = 6
-        )
-      ),
-      new MmuPlugin(
-        virtualRange = _ (31 downto 28) === 0xC,
-        ioRange = _ (31 downto 28) === 0xF
-      ),
-      new DecoderSimplePlugin(
-        catchIllegalInstruction = true
-      ),
-      new RegFilePlugin(
-        regFileReadyKind = plugin.SYNC,
-        zeroBoot = false
-      ),
-      new IntAluPlugin,
-      new SrcPlugin(
-        separatedAddSub = false,
-        executeInsertion = true
-      ),
-      new FullBarrelShifterPlugin,
-      new HazardSimplePlugin(
-        bypassExecute = true,
-        bypassMemory = true,
-        bypassWriteBack = true,
-        bypassWriteBackBuffer = true,
-        pessimisticUseSrc = false,
-        pessimisticWriteRegFile = false,
-        pessimisticAddressMatch = false
-      ),
-      new MulPlugin,
-      new DivPlugin,
-      new CsrPlugin(CsrPluginConfig.small(0x80000020l)),
-      new DebugPlugin(ClockDomain.current.clone(reset = spinal.core.Bool().setName("debugReset"))),
-      new BranchPlugin(
-        earlyBranch = false,
-        catchAddressMisaligned = true
-      ),
-      new YamlPlugin("cpu0.yaml")
-    )
-  )
-
-  def cpu() = new VR(
-    config
-  )
-
-  SpinalVerilog(cpu())
-
   val chipyardDir = System.getProperty("user.dir")
   val vexRiscvVsrcDir = s"$chipyardDir"
+  val targetVerilogFile = s"$vexRiscvVsrcDir/VexRiscv.v"
 
-  addPath(s"$vexRiscvVsrcDir/VexRiscv.v")
+  val file = File(targetVerilogFile)
+  if (file.exists) {
+    if (!file.delete()) {
+      println(s"Waring: cannot delete file $file")
+    }
+  }
+
+  val config = SpinalConfig()
+  config.generateVerilog({
+    val toplevel = new VexCoreUse(VexAXIConfig.default)
+    toplevel
+  })
+
+  addPath(targetVerilogFile)
 }
