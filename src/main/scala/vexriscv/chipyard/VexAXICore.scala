@@ -168,9 +168,7 @@ class VexAXICore
 
   val file = File(targetVerilogFile)
   if (file.exists) {
-    if (!file.delete()) {
-      println(s"Waring: cannot delete file $file")
-    }
+    require(file.delete(), s"Waring: cannot delete file $file")
   }
 
   val config = SpinalConfig()

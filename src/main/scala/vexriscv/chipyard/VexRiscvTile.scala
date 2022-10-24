@@ -66,21 +66,21 @@ case class VexRiscvCoreParams
   val nPTECacheEntries: Int = 8 // TODO: Check
 }
 
-case class VexRiscvTileAttachParams(
-                                 tileParams: VexRiscvTileParams,
-                                 crossingParams: RocketCrossingParams
-                               ) extends CanAttachTile {
+case class VexRiscvTileAttachParams
+(tileParams: VexRiscvTileParams,
+ crossingParams: RocketCrossingParams
+) extends CanAttachTile {
   type TileType = VexRiscvTile
   val lookup = PriorityMuxHartIdFromSeq(Seq(tileParams))
 }
 
 // TODO: BTBParams, DCacheParams, ICacheParams are incorrect in DTB... figure out defaults in VexRiscv and put in DTB
-case class VexRiscvTileParams(
-                           name: Option[String] = Some("vexRiscv_tile"),
-                           hartId: Int = 0,
-                           trace: Boolean = false,
-                           val core: VexRiscvCoreParams = VexRiscvCoreParams()
-                         ) extends InstantiableTileParams[VexRiscvTile] {
+case class VexRiscvTileParams
+(name: Option[String] = Some("vexRiscv_tile"),
+ hartId: Int = 0,
+ trace: Boolean = false,
+ val core: VexRiscvCoreParams = VexRiscvCoreParams()
+) extends InstantiableTileParams[VexRiscvTile] {
   val beuAddr: Option[BigInt] = None
   val blockerCtrlAddr: Option[BigInt] = None
   val btb: Option[BTBParams] = Some(BTBParams())
@@ -94,11 +94,11 @@ case class VexRiscvTileParams(
   }
 }
 
-class VexRiscvTile private(
-                        val vexRiscvParams: VexRiscvTileParams,
-                        crossing: ClockCrossingType,
-                        lookup: LookupByHartIdImpl,
-                        q: Parameters)
+class VexRiscvTile private
+(val vexRiscvParams: VexRiscvTileParams,
+ crossing: ClockCrossingType,
+ lookup: LookupByHartIdImpl,
+ q: Parameters)
   extends BaseTile(vexRiscvParams, crossing, lookup, q)
     with SinksExternalInterrupts
     with SourcesExternalNotifications {
@@ -158,44 +158,76 @@ class VexRiscvTile private(
   val beatBytes = masterPortBeatBytes
   val sourceBits = 1 // equiv. to userBits (i think)
 
-  // val memAXI4Nodes = AXI4MasterNode(
-  //   Seq(
-  //     AXI4MasterPortParameters(
+  // val memAXI4Nodes = Seq(
+  //   AXI4MasterNode(Seq(AXI4MasterPortParameters(
   //     masters = Seq(AXI4MasterParameters(
   //       name = portName + "-imem",
-  //       id = IdRange(0, 1 << idBits)))),
-  //     AXI4MasterPortParameters(
-  //       masters = Seq(AXI4MasterParameters(
-  //         name = portName + "-dmem",
-  //         id = IdRange(0, 1 << idBits))))
-  //   ))
-
+  //       id = IdRange(0, 1 << idBits)))))),
+  //   AXI4MasterNode(Seq(AXI4MasterPortParameters(
+  //     masters = Seq(AXI4MasterParameters(
+  //       name = portName + "-dmem",
+  //       id = IdRange(1 << idBits, 1 << (idBits * 2)))))))
+  // )
   val memAXI4Nodes = Seq(
     AXI4MasterNode(Seq(AXI4MasterPortParameters(
-      masters = Seq(AXI4MasterParameters(
-        name = portName + "-imem",
-        id = IdRange(0, 1 << idBits)))))),
+      masters = Seq(AXI4MasterParameters(portName + "-imem"))))),
     AXI4MasterNode(Seq(AXI4MasterPortParameters(
-      masters = Seq(AXI4MasterParameters(
-        name = portName + "-dmem",
-        id = IdRange(0, 1 << idBits))))))
+      masters = Seq(AXI4MasterParameters(portName + "-dmem")))))
   )
+  // val memAXI4Node =
+  // AXI4MasterNode(Seq(
+  //   AXI4MasterPortParameters(masters = Seq(AXI4MasterParameters(portName + "-imem"))),
+  //   AXI4MasterPortParameters(masters = Seq(AXI4MasterParameters(portName + "-dmem")))))
 
   val memoryTap = TLIdentityNode()
-  val xbar = AXI4Xbar()
-  (tlMasterXbar.node
-    := memoryTap
-    := TLBuffer()
-    := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
-    := TLWidthWidget(beatBytes) // reduce size of TL
-    := AXI4ToTL() // convert to TL
-    := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
-    := AXI4Fragmenter() // deal with multi-beat xacts
-    := xbar
-    // := memAXI4Nodes
-    )
-  xbar := memAXI4Nodes.head
-  xbar := memAXI4Nodes(1)
+
+  val useTLXBar = false
+  // val useTLXBar = true
+
+  if (useTLXBar) {
+    val xbar = TLXbar()
+    (tlMasterXbar.node
+      := memoryTap
+      := TLBuffer()
+      := xbar)
+    (xbar := TLBuffer() := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
+      := TLWidthWidget(beatBytes) // reduce size of TL
+      := AXI4ToTL() // convert to TL
+      := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
+      := AXI4Fragmenter() // deal with multi-beat xacts
+      := memAXI4Nodes.head)
+    (xbar := TLBuffer() := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
+      := TLWidthWidget(beatBytes) // reduce size of TL
+      := AXI4ToTL() // convert to TL
+      := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
+      := AXI4Fragmenter() // deal with multi-beat xacts
+      := memAXI4Nodes(1))
+  } else {
+    val xbar = AXI4Xbar()
+    (tlMasterXbar.node
+      := memoryTap
+      := TLBuffer()
+      := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
+      := TLWidthWidget(beatBytes) // reduce size of TL
+      := AXI4ToTL() // convert to TL
+      := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
+      := AXI4Fragmenter() // deal with multi-beat xacts
+      := xbar)
+    // xbar := AXI4UserYanker(Some(2)) := AXI4Fragmenter() := memAXI4Nodes.head
+    // xbar := AXI4UserYanker(Some(2)) := AXI4Fragmenter() := memAXI4Nodes(1)
+    xbar := memAXI4Nodes.head
+    xbar := memAXI4Nodes(1)
+  }
+
+  // (tlMasterXbar.node
+  //   := memoryTap
+  //   := TLBuffer()
+  //   := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
+  //   := TLWidthWidget(beatBytes) // reduce size of TL
+  //   := AXI4ToTL() // convert to TL
+  //   := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
+  //   := AXI4Fragmenter() // deal with multi-beat xacts
+  //   := memAXI4Node)
 
   def connectVexRiscvInterrupts(ints: UInt) {
     val (interrupts, _) = intSinkNode.in(0)
