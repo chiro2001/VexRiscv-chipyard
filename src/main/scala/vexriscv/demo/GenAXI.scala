@@ -134,6 +134,34 @@ class VexAXICore(val config: VexAXIConfig) extends Component {
   val debug = true
   val interruptCount = 4
 
+  val iBusConfig = InstructionCacheConfig(
+    cacheSize = 4096,
+    bytePerLine = 32,
+    wayCount = 1,
+    addressWidth = 32,
+    cpuDataWidth = 32,
+    memDataWidth = 32,
+    catchIllegalAccess = true,
+    catchAccessFault = true,
+    asyncTagMemory = false,
+    twoCycleRam = true,
+    twoCycleCache = true
+  )
+
+  val dBusConfig = DataCacheConfig(
+    cacheSize = 4096,
+    bytePerLine = 32,
+    wayCount = 1,
+    addressWidth = 32,
+    cpuDataWidth = 32,
+    memDataWidth = 32,
+    catchAccessError = true,
+    catchIllegal = true,
+    catchUnaligned = true
+  )
+
+  val (useSimpleIBus, useSimpleDBus) = (false, false)
+
   val io = new Bundle {
     //Clocks / reset
     val asyncReset = in Bool()
@@ -145,8 +173,8 @@ class VexAXICore(val config: VexAXIConfig) extends Component {
     val coreInterrupt = in Bool()
 
     // mem bus
-    val iBus = master(Axi4ReadOnly(IBusSimpleBus.getAxi4Config()))
-    val dBus = master(Axi4Shared(DBusSimpleBus.getAxi4Config()))
+    val iBus = master(Axi4ReadOnly(if (useSimpleIBus) IBusSimpleBus.getAxi4Config() else iBusConfig.getAxi4Config()))
+    val dBus = master(Axi4Shared(if (useSimpleDBus) DBusSimpleBus.getAxi4Config() else dBusConfig.getAxi4SharedConfig()))
   }
 
   // val timerCtrl = PinsecTimerCtrl()
@@ -189,57 +217,30 @@ class VexAXICore(val config: VexAXIConfig) extends Component {
     val config = VexRiscvConfig(
       plugins = ArrayBuffer(
         new PcManagerSimplePlugin(0x80000000l, false),
-        //          new IBusSimplePlugin(
-        //            interfaceKeepData = false,
-        //            catchAccessFault = true
-        //          ),
-        // new IBusCachedPlugin(
-        //   resetVector = 0x80000000l,
-        //   prediction = STATIC,
-        //   config = InstructionCacheConfig(
-        //     cacheSize = 4096,
-        //     bytePerLine = 32,
-        //     wayCount = 1,
-        //     addressWidth = 32,
-        //     cpuDataWidth = 32,
-        //     memDataWidth = 32,
-        //     catchIllegalAccess = true,
-        //     catchAccessFault = true,
-        //     asyncTagMemory = false,
-        //     twoCycleRam = true,
-        //     twoCycleCache = true
-        //   )
-        //   //            askMemoryTranslation = true,
-        //   //            memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
-        //   //              portTlbSize = 4
-        //   //            )
-        // ),
-        new IBusSimplePlugin(
+        if (!useSimpleIBus) new IBusCachedPlugin(
           resetVector = 0x80000000l,
-          false, true
+          prediction = STATIC,
+          config = iBusConfig,
+          // askMemoryTranslation = true,
+          // memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
+          //   portTlbSize = 4
+          // )
+        ) else
+          new IBusSimplePlugin(
+            resetVector = 0x80000000l,
+            false, true
+          ),
+        if (!useSimpleDBus) new DBusCachedPlugin(
+          config = dBusConfig,
+          // // memoryTranslatorPortConfig = null,
+          // memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
+          //   portTlbSize = 6
+          // )
+        )
+        else new DBusSimplePlugin(
+          catchAddressMisaligned = true,
+          catchAccessFault = true
         ),
-        //                    new DBusSimplePlugin(
-        //                      catchAddressMisaligned = true,
-        //                      catchAccessFault = true
-        //                    ),
-        // new DBusCachedPlugin(
-        //   config = new DataCacheConfig(
-        //     cacheSize = 4096,
-        //     bytePerLine = 32,
-        //     wayCount = 1,
-        //     addressWidth = 32,
-        //     cpuDataWidth = 32,
-        //     memDataWidth = 32,
-        //     catchAccessError = true,
-        //     catchIllegal = true,
-        //     catchUnaligned = true
-        //   ),
-        //   memoryTranslatorPortConfig = null
-        //   //            memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
-        //   //              portTlbSize = 6
-        //   //            )
-        // ),
-        new DBusSimplePlugin(),
         new StaticMemoryTranslatorPlugin(
           ioRange = _ (31 downto 28) === 0xF
         ),

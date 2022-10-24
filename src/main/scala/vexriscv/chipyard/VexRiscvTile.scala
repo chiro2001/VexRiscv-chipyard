@@ -197,14 +197,13 @@ class VexRiscvTile private(
   xbar := memAXI4Nodes.head
   xbar := memAXI4Nodes(1)
 
-  def connectVexRiscvInterrupts(irq_line: UInt, soft_irq: Bool) {
+  def connectVexRiscvInterrupts(ints: UInt) {
     val (interrupts, _) = intSinkNode.in(0)
     // debug := interrupts(0)
     // msip := interrupts(1)
     // mtip := interrupts(2)
     // m_s_eip := Cat(interrupts(4), interrupts(3))
-    irq_line := (interrupts.asUInt >> 1.U).asUInt
-    soft_irq := interrupts.head
+    ints := interrupts.asUInt
   }
 }
 
@@ -246,16 +245,11 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   val core = Module(new VexAXICore).suggestName("vexRiscv_core_inst")
 
   core.io.clk := clock
-  core.io.rtc_clk := clock
-  core.io.rst_n := ~reset.asBool
-  core.io.cpu_rst_n := ~reset.asBool
-  core.io.pwrup_rst_n := ~reset.asBool
-  core.io.test_mode := false.B
-  core.io.test_rst_n := ~reset.asBool
-  // core.io.boot_addr_i := outer.resetVectorSinkNode.bundle
-  core.io.fuse_mhartid := outer.hartIdSinkNode.bundle
+  core.io.io_axiClk := clock
+  core.io.reset := reset.asBool
+  core.io.io_asyncReset := reset.asBool
 
-  outer.connectVexRiscvInterrupts(core.io.irq_lines, core.io.soft_irq)
+  outer.connectVexRiscvInterrupts(core.io.io_coreInterrupt)
 
   if (outer.vexRiscvParams.trace) {
     // unpack the trace io from a UInt into Vec(TracedInstructions)
@@ -280,112 +274,91 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   // connect the axi interface
   // require(outer.memAXI4Nodes.out.size == 2, "This core requires imem and dmem AXI ports!")
   require(outer.memAXI4Nodes.size == 2, "This core requires imem and dmem AXI ports!")
-  outer.memAXI4Nodes.head.out.head match {
+  outer.memAXI4Nodes(1).out.head match {
     case (out, edgeOut) =>
-      core.io.io_axi_imem_awready := out.aw.ready
-      out.aw.valid := core.io.io_axi_imem_awvalid
-      out.aw.bits.id := core.io.io_axi_imem_awid
-      out.aw.bits.addr := core.io.io_axi_imem_awaddr
-      out.aw.bits.len := core.io.io_axi_imem_awlen
-      out.aw.bits.size := core.io.io_axi_imem_awsize
-      out.aw.bits.burst := core.io.io_axi_imem_awburst
-      out.aw.bits.lock := core.io.io_axi_imem_awlock
-      out.aw.bits.cache := core.io.io_axi_imem_awcache
-      out.aw.bits.prot := core.io.io_axi_imem_awprot
-      out.aw.bits.qos := core.io.io_axi_imem_awqos
-      // unused signals
-      assert(core.io.io_axi_imem_awregion === 0.U)
-      assert(core.io.io_axi_imem_awuser === 0.U)
+      core.io.io_dBus_arw_ready := out.aw.ready
+      out.aw.valid := core.io.io_dBus_arw_valid & core.io.io_dBus_arw_payload_write
+      out.aw.bits.id := 0.U
+      out.aw.bits.addr := core.io.io_dBus_arw_payload_addr
+      out.aw.bits.len := core.io.io_dBus_arw_payload_len
+      out.aw.bits.size := core.io.io_dBus_arw_payload_size
+      out.aw.bits.burst := "b01".U
+      out.aw.bits.lock := "b00".U
+      out.aw.bits.cache := core.io.io_dBus_arw_payload_cache
+      out.aw.bits.prot := core.io.io_dBus_arw_payload_prot
+      out.aw.bits.qos := "b0000".U
 
-      core.io.io_axi_imem_wready := out.w.ready
-      out.w.valid := core.io.io_axi_imem_wvalid
-      out.w.bits.data := core.io.io_axi_imem_wdata
-      out.w.bits.strb := core.io.io_axi_imem_wstrb
-      out.w.bits.last := core.io.io_axi_imem_wlast
-      // unused signals
-      assert(core.io.io_axi_imem_wuser === 0.U)
+      core.io.io_dBus_w_ready := out.w.ready
+      out.w.valid := core.io.io_dBus_w_valid
+      out.w.bits.data := core.io.io_dBus_w_payload_data
+      out.w.bits.strb := core.io.io_dBus_w_payload_strb
+      out.w.bits.last := core.io.io_dBus_w_payload_last
 
-      out.b.ready := core.io.io_axi_imem_bready
-      core.io.io_axi_imem_bvalid := out.b.valid
-      core.io.io_axi_imem_bid := out.b.bits.id
-      core.io.io_axi_imem_bresp := out.b.bits.resp
-      core.io.io_axi_imem_buser := 0.U // unused
+      out.b.ready := core.io.io_dBus_b_ready
+      core.io.io_dBus_b_valid := out.b.valid
+      core.io.io_dBus_b_payload_resp := out.b.bits.resp
 
-      core.io.io_axi_imem_arready := out.ar.ready
-      out.ar.valid := core.io.io_axi_imem_arvalid
-      out.ar.bits.id := core.io.io_axi_imem_arid
-      out.ar.bits.addr := core.io.io_axi_imem_araddr
-      out.ar.bits.len := core.io.io_axi_imem_arlen
-      out.ar.bits.size := core.io.io_axi_imem_arsize
-      out.ar.bits.burst := core.io.io_axi_imem_arburst
-      out.ar.bits.lock := core.io.io_axi_imem_arlock
-      out.ar.bits.cache := core.io.io_axi_imem_arcache
-      out.ar.bits.prot := core.io.io_axi_imem_arprot
-      out.ar.bits.qos := core.io.io_axi_imem_arqos
-      // unused signals
-      assert(core.io.io_axi_imem_arregion === 0.U)
-      assert(core.io.io_axi_imem_aruser === 0.U)
+      core.io.io_dBus_arw_ready := out.ar.ready
+      out.ar.valid := core.io.io_dBus_arw_valid & !core.io.io_dBus_arw_payload_write
+      out.ar.bits.id := 0.U
+      out.ar.bits.addr := core.io.io_dBus_arw_payload_addr
+      out.ar.bits.len := 0.U
+      out.ar.bits.size := core.io.io_dBus_arw_payload_size
+      out.ar.bits.burst := "b01".U
+      out.ar.bits.lock := "b00".U
+      out.ar.bits.cache := core.io.io_dBus_arw_payload_cache
+      out.ar.bits.prot := core.io.io_dBus_arw_payload_prot
+      out.ar.bits.qos := "b0000".U
 
-      out.r.ready := core.io.io_axi_imem_rready
-      core.io.io_axi_imem_rvalid := out.r.valid
-      core.io.io_axi_imem_rid := out.r.bits.id
-      core.io.io_axi_imem_rdata := out.r.bits.data
-      core.io.io_axi_imem_rresp := out.r.bits.resp
-      core.io.io_axi_imem_rlast := out.r.bits.last
-      core.io.io_axi_imem_ruser := 0.U // unused
+      out.r.ready := core.io.io_dBus_r_ready
+      core.io.io_dBus_r_valid := out.r.valid
+      core.io.io_dBus_r_payload_data := out.r.bits.data
+      core.io.io_dBus_r_payload_resp := out.r.bits.resp
+      core.io.io_dBus_r_payload_last := out.r.bits.last
   }
   outer.memAXI4Nodes.head.out.head match {
     case (out, edgeOut) =>
-      core.io.io_axi_dmem_awready := out.aw.ready
-      out.aw.valid := core.io.io_axi_dmem_awvalid
-      out.aw.bits.id := core.io.io_axi_dmem_awid
-      out.aw.bits.addr := core.io.io_axi_dmem_awaddr
-      out.aw.bits.len := core.io.io_axi_dmem_awlen
-      out.aw.bits.size := core.io.io_axi_dmem_awsize
-      out.aw.bits.burst := core.io.io_axi_dmem_awburst
-      out.aw.bits.lock := core.io.io_axi_dmem_awlock
-      out.aw.bits.cache := core.io.io_axi_dmem_awcache
-      out.aw.bits.prot := core.io.io_axi_dmem_awprot
-      out.aw.bits.qos := core.io.io_axi_dmem_awqos
-      // unused signals
-      assert(core.io.io_axi_dmem_awregion === 0.U)
-      assert(core.io.io_axi_dmem_awuser === 0.U)
+      // core.io.io_iBus_arw_ready := out.aw.ready
+      // out.aw.valid := core.io.io_iBus_arw_valid
+      // out.aw.bits.id := 0.U
+      // out.aw.bits.addr := core.io.io_iBus_arw_payload_addr
+      // out.aw.bits.len := 0.U
+      // out.aw.bits.size := core.io.io_iBus_arw_payload_size
+      // out.aw.bits.burst := "b01".U
+      // out.aw.bits.lock := "b00".U
+      // out.aw.bits.cache := core.io.io_iBus_arw_payload_cache
+      // out.aw.bits.prot := core.io.io_iBus_arw_payload_prot
+      // out.aw.bits.qos := "b0000".U
+      out.aw := DontCare
 
-      core.io.io_axi_dmem_wready := out.w.ready
-      out.w.valid := core.io.io_axi_dmem_wvalid
-      out.w.bits.data := core.io.io_axi_dmem_wdata
-      out.w.bits.strb := core.io.io_axi_dmem_wstrb
-      out.w.bits.last := core.io.io_axi_dmem_wlast
-      // unused signals
-      assert(core.io.io_axi_dmem_wuser === 0.U)
+      // core.io.io_iBus_w_ready := out.w.ready
+      // out.w.valid := core.io.io_iBus_w_valid
+      // out.w.bits.data := core.io.io_iBus_w_payload_data
+      // out.w.bits.strb := core.io.io_iBus_w_payload_strb
+      // out.w.bits.last := core.io.io_iBus_w_payload_last
+      out.w := DontCare
 
-      out.b.ready := core.io.io_axi_dmem_bready
-      core.io.io_axi_dmem_bvalid := out.b.valid
-      core.io.io_axi_dmem_bid := out.b.bits.id
-      core.io.io_axi_dmem_bresp := out.b.bits.resp
-      core.io.io_axi_dmem_buser := 0.U // unused
+      // out.b.ready := core.io.io_iBus_b_ready
+      // core.io.io_iBus_b_valid := out.b.valid
+      // core.io.io_iBus_b_payload_resp := out.b.bits.resp
+      out.b := DontCare
 
-      core.io.io_axi_dmem_arready := out.ar.ready
-      out.ar.valid := core.io.io_axi_dmem_arvalid
-      out.ar.bits.id := core.io.io_axi_dmem_arid
-      out.ar.bits.addr := core.io.io_axi_dmem_araddr
-      out.ar.bits.len := core.io.io_axi_dmem_arlen
-      out.ar.bits.size := core.io.io_axi_dmem_arsize
-      out.ar.bits.burst := core.io.io_axi_dmem_arburst
-      out.ar.bits.lock := core.io.io_axi_dmem_arlock
-      out.ar.bits.cache := core.io.io_axi_dmem_arcache
-      out.ar.bits.prot := core.io.io_axi_dmem_arprot
-      out.ar.bits.qos := core.io.io_axi_dmem_arqos
-      // unused signals
-      assert(core.io.io_axi_dmem_arregion === 0.U)
-      assert(core.io.io_axi_dmem_aruser === 0.U)
+      core.io.io_iBus_ar_ready := out.ar.ready
+      out.ar.valid := core.io.io_iBus_ar_valid
+      out.ar.bits.id := 0.U
+      out.ar.bits.addr := core.io.io_iBus_ar_payload_addr
+      out.ar.bits.len := core.io.io_iBus_ar_payload_len
+      out.ar.bits.size := "b010".U
+      out.ar.bits.burst := core.io.io_iBus_ar_payload_burst
+      out.ar.bits.lock := "b00".U
+      out.ar.bits.cache := core.io.io_iBus_ar_payload_cache
+      out.ar.bits.prot := core.io.io_iBus_ar_payload_prot
+      out.ar.bits.qos := "b0000".U
 
-      out.r.ready := core.io.io_axi_dmem_rready
-      core.io.io_axi_dmem_rvalid := out.r.valid
-      core.io.io_axi_dmem_rid := out.r.bits.id
-      core.io.io_axi_dmem_rdata := out.r.bits.data
-      core.io.io_axi_dmem_rresp := out.r.bits.resp
-      core.io.io_axi_dmem_rlast := out.r.bits.last
-      core.io.io_axi_dmem_ruser := 0.U // unused
+      out.r.ready := core.io.io_iBus_r_ready
+      core.io.io_iBus_r_valid := out.r.valid
+      core.io.io_iBus_r_payload_data := out.r.bits.data
+      core.io.io_iBus_r_payload_resp := out.r.bits.resp
+      core.io.io_iBus_r_payload_last := out.r.bits.last
   }
 }
