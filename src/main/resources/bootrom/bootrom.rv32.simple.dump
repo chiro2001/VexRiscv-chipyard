@@ -5,17 +5,27 @@ bootrom.rv32.simple.elf:     file format elf32-littleriscv
 Disassembly of section .text.start:
 
 00010000 <_start>:
-   10000:	020005b7          	lui	a1,0x2000
-   10004:	00800513          	li	a0,8
-   10008:	30451073          	csrw	mie,a0
-   1000c:	30052073          	csrs	mstatus,a0
-   10010:	00000517          	auipc	a0,0x0
-   10014:	07050513          	addi	a0,a0,112 # 10080 <_hang80>
-   10018:	30551073          	csrw	mtvec,a0
+   10000:	54000537          	lui	a0,0x54000
+   10004:	05300593          	li	a1,83
+   10008:	05400613          	li	a2,84
+   1000c:	04100693          	li	a3,65
+   10010:	05200713          	li	a4,82
+   10014:	05400793          	li	a5,84
+   10018:	00a00813          	li	a6,10
+   1001c:	00b52023          	sw	a1,0(a0) # 54000000 <_dtb+0x53feff40>
+   10020:	00c52023          	sw	a2,0(a0)
+   10024:	00d52023          	sw	a3,0(a0)
+   10028:	00e52023          	sw	a4,0(a0)
+   1002c:	00f52023          	sw	a5,0(a0)
+   10030:	01052023          	sw	a6,0(a0)
+   10034:	020005b7          	lui	a1,0x2000
+   10038:	3ff00293          	li	t0,1023
+   1003c:	00100313          	li	t1,1
 
-0001001c <wfi_loop>:
-   1001c:	10500073          	wfi
-   10020:	ffdff06f          	j	1001c <wfi_loop>
+00010040 <start_loop>:
+   10040:	406282b3          	sub	t0,t0,t1
+   10044:	fe029ee3          	bnez	t0,10040 <start_loop>
+   10048:	0500006f          	j	10098 <boot_core_hart0>
 
 Disassembly of section .text.hang80:
 

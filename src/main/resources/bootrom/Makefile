@@ -26,4 +26,4 @@ dump: $(bootrom_dump)
 	$(OBJDUMP) -d $< > $@
 
 clean:
-	rm -f *.elf *.dump *.img
+	-rm -f *.elf *.dump *.img

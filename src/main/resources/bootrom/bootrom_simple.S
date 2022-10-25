@@ -1,5 +1,7 @@
 #define BOOTADDR_REG 0x4000
+#ifndef UARTPORT
 #define UARTPORT 0x54000000
+#endif
 
 // boot all cores (only hart 0) and jump to main program execution
 .section .text.start, "ax", @progbits
@@ -20,15 +22,24 @@ _start:
 	sw a5,0(a0)
 	sw a6,0(a0)
   li a1, 0x2000000 // base address of clint
-  li a0, 8               // MIE or MSIP bit
-  csrw mie, a0           // set only MSIP in MIE CSR
-  csrs mstatus, a0       // set MIE in mstatus CSR, open interrupts
-  la a0, _hang80          // on MSIP interrupt, go to _hang80
-  csrw mtvec, a0
+  # li a0, 8               // MIE or MSIP bit
+  # csrw mie, a0           // set only MSIP in MIE CSR
+  # li t0, (0b01 << 11) | (1 << 7) | (1 << 3) // set MIE, MPIE, MPP
+  # csrw mstatus, t0
+  # # csrs mstatus, a0       // set MIE in mstatus CSR, open interrupts
+  # la a0, _hang80           // on MSIP interrupt, go to _hang80
+  # csrw mtvec, a0
+  # csrw satp, zero  // disable MMU
+  li t0, 0x3ff
+  li t1, 1
+start_loop:
+  sub t0, t0, t1
+  bnez t0, start_loop
+  j boot_core_hart0
 
-wfi_loop: // wait for MSIP interrupt to start program execution
-  wfi
-  j wfi_loop
+# wfi_loop: // wait for MSIP interrupt to start program execution
+#   wfi
+#   j wfi_loop
 
 // jump to reset vector
 .section .text.hang80, "ax", @progbits
