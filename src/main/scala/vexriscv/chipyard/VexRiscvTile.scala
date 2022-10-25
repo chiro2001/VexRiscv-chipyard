@@ -158,16 +158,6 @@ class VexRiscvTile private
   val beatBytes = masterPortBeatBytes
   val sourceBits = 1 // equiv. to userBits (i think)
 
-  // val memAXI4Nodes = Seq(
-  //   AXI4MasterNode(Seq(AXI4MasterPortParameters(
-  //     masters = Seq(AXI4MasterParameters(
-  //       name = portName + "-imem",
-  //       id = IdRange(0, 1 << idBits)))))),
-  //   AXI4MasterNode(Seq(AXI4MasterPortParameters(
-  //     masters = Seq(AXI4MasterParameters(
-  //       name = portName + "-dmem",
-  //       id = IdRange(1 << idBits, 1 << (idBits * 2)))))))
-  // )
   val memAXI4Nodes = Seq(
     AXI4MasterNode(Seq(AXI4MasterPortParameters(
       masters = Seq(AXI4MasterParameters(portName + "-imem"))))),

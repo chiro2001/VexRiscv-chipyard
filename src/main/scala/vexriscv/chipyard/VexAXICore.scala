@@ -14,6 +14,8 @@ package vexriscv.chipyard
 import chisel3._
 import chisel3.util._
 import spinal.core.SpinalConfig
+import vexriscv.demo.VexAXIConfig
+// import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 
 import scala.tools.nsc.io.File
