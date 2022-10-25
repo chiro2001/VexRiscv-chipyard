@@ -20,6 +20,24 @@ import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 
 import scala.tools.nsc.io.File
 
+//   output              io_rvfi_valid,
+//   output     [63:0]   io_rvfi_order,
+//   output     [31:0]   io_rvfi_insn,
+//   output              io_rvfi_trap,
+//   output              io_rvfi_halt,
+//   output              io_rvfi_intr,
+//   output     [31:0]   io_rvfi_pc_rdata,
+//   output     [31:0]   io_rvfi_pc_wdata,
+trait VexRiscvCoreIOIRvfi extends Bundle {
+  val io_rvfi_valid = Output(Bool())
+  val io_rvfi_order = Output(UInt((63 + 1).W))
+  val io_rvfi_insn = Output(UInt((31 + 1).W))
+  val io_rvfi_trap = Output(Bool())
+  val io_rvfi_halt = Output(Bool())
+  val io_rvfi_intr = Output(Bool())
+  val io_rvfi_pc_rdata = Output(UInt((31 + 1).W))
+  val io_rvfi_pc_wdata = Output(UInt((31 + 1).W))
+}
 //   input               io_asyncReset,
 //   input               io_axiClk,
 //   input               io_coreInterrupt,
@@ -154,10 +172,10 @@ class VexRiscvCoreIO extends Bundle
   with VexRiscvCoreIOIRQ
   with VexRiscvCoreIOIMem
   with VexRiscvCoreIODMem
+  with VexRiscvCoreIOIRvfi
 
 class VexAXICore
   extends BlackBox
-    // with HasBlackBoxResource
     with HasBlackBoxPath {
   val io = IO(new VexRiscvCoreIO)
 

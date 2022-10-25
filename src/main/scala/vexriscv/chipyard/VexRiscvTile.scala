@@ -62,7 +62,7 @@ case class VexRiscvCoreParams
   val lrscCycles: Int = 80 // copied from Rocket
   val decodeWidth: Int = 1 // TODO: Check
   val fetchWidth: Int = 1 // TODO: Check
-  val retireWidth: Int = 2
+  val retireWidth: Int = 1
   val nPTECacheEntries: Int = 8 // TODO: Check
 }
 
@@ -278,16 +278,16 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
     //outer.traceSourceNode.bundle <> core.io.trace_o.asTypeOf(outer.traceSourceNode.bundle)
 
     // TODO: add tracer
-    // for (w <- 0 until outer.vexRiscvParams.core.retireWidth) {
-    //   outer.traceSourceNode.bundle(w).valid := core.io.trace_o(traceInstSz * w + 2)
-    //   outer.traceSourceNode.bundle(w).iaddr := core.io.trace_o(traceInstSz * w + 42, traceInstSz * w + 3)
-    //   outer.traceSourceNode.bundle(w).insn := core.io.trace_o(traceInstSz * w + 74, traceInstSz * w + 43)
-    //   outer.traceSourceNode.bundle(w).priv := core.io.trace_o(traceInstSz * w + 77, traceInstSz * w + 75)
-    //   outer.traceSourceNode.bundle(w).exception := core.io.trace_o(traceInstSz * w + 78)
-    //   outer.traceSourceNode.bundle(w).interrupt := core.io.trace_o(traceInstSz * w + 79)
-    //   outer.traceSourceNode.bundle(w).cause := core.io.trace_o(traceInstSz * w + 87, traceInstSz * w + 80)
-    //   outer.traceSourceNode.bundle(w).tval := core.io.trace_o(traceInstSz * w + 127, traceInstSz * w + 88)
-    // }
+    for (w <- 0 until outer.vexRiscvParams.core.retireWidth) {
+      outer.traceSourceNode.bundle(w).valid := core.io.io_rvfi_valid
+      outer.traceSourceNode.bundle(w).iaddr := core.io.io_rvfi_pc_rdata
+      outer.traceSourceNode.bundle(w).insn := core.io.io_rvfi_insn
+      outer.traceSourceNode.bundle(w).priv := 3.U
+      outer.traceSourceNode.bundle(w).exception := false.B
+      outer.traceSourceNode.bundle(w).interrupt := core.io.io_rvfi_intr
+      outer.traceSourceNode.bundle(w).cause := 0.U
+      outer.traceSourceNode.bundle(w).tval := 0.U
+    }
   } else {
     outer.traceSourceNode.bundle := DontCare
     outer.traceSourceNode.bundle map (t => t.valid := false.B)

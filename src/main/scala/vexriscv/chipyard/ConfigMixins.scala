@@ -21,7 +21,7 @@ class WithNVexRiscvCores(n: Int = 1, overrideIdOffset: Option[Int] = None) exten
     val idOffset = overrideIdOffset.getOrElse(prev.size)
     (0 until n).map { i =>
       VexRiscvTileAttachParams(
-        tileParams = VexRiscvTileParams(hartId = i + idOffset),
+        tileParams = VexRiscvTileParams(hartId = i + idOffset, trace = true),
         crossingParams = RocketCrossingParams()
       )
     } ++ prev

@@ -182,6 +182,7 @@ class VexAXICore(val config: VexAXIConfig) extends Component {
     // val jtag = slave(Jtag())
     // val timerExternal = in(PinsecTimerCtrlExternal())
     val coreInterrupt = in Bool()
+    val rvfi = master(new SimpleRvfiPort)
 
     // mem bus
     val iBus = master(Axi4ReadOnly(if (useSimpleIBus) IBusSimpleBus.getAxi4Config() else iBusConfig.getAxi4Config()))
@@ -246,6 +247,10 @@ class VexAXICore(val config: VexAXIConfig) extends Component {
       case plugin: DBusCachedPlugin => {
         println("dBus use cached AXI")
         dBus = plugin.dBus.toAxi4Shared(stageCmd = true)
+      }
+      case plugin: SimpleFormalPlugin => {
+        println("Enabled SimpleFormalPlugin")
+        plugin.rvfi <> io.rvfi
       }
       case plugin: CsrPlugin => {
         plugin.externalInterrupt := BufferCC(io.coreInterrupt)
