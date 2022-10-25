@@ -14,7 +14,7 @@ package vexriscv.chipyard
 import chisel3._
 import chisel3.util._
 import spinal.core.SpinalConfig
-import vexriscv.demo.VexAXIConfig
+import vexriscv.demo.{VexAXIConfig, VexInterfaceConfig}
 // import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 
@@ -61,8 +61,8 @@ trait VexRiscvCoreIOIMem extends Bundle {
   val io_iBus_ar_valid = Output(Bool())
   val io_iBus_ar_ready = Input(Bool())
   val io_iBus_ar_payload_addr = Output(UInt((31 + 1).W))
-  val io_iBus_ar_payload_len = Output(UInt((7 + 1).W))
-  val io_iBus_ar_payload_burst = Output(UInt((1 + 1).W))
+  val io_iBus_ar_payload_len = if (VexInterfaceConfig.useSimpleIBusExpected) None else Some(Output(UInt((7 + 1).W)))
+  val io_iBus_ar_payload_burst = if (VexInterfaceConfig.useSimpleIBusExpected) None else Some(Output(UInt((1 + 1).W)))
   val io_iBus_ar_payload_cache = Output(UInt((3 + 1).W))
   val io_iBus_ar_payload_prot = Output(UInt((2 + 1).W))
   val io_iBus_r_valid = Input(Bool())
@@ -89,7 +89,7 @@ trait VexRiscvCoreIODMem extends Bundle {
   val io_dBus_arw_valid = Output(Bool())
   val io_dBus_arw_ready = Input(Bool())
   val io_dBus_arw_payload_addr = Output(UInt((31 + 1).W))
-  val io_dBus_arw_payload_len = Output(UInt((7 + 1).W))
+  val io_dBus_arw_payload_len = if (VexInterfaceConfig.useSimpleIBusExpected) None else Some(Output(UInt((7 + 1).W)))
   val io_dBus_arw_payload_size = Output(UInt((2 + 1).W))
   val io_dBus_arw_payload_cache = Output(UInt((3 + 1).W))
   val io_dBus_arw_payload_prot = Output(UInt((2 + 1).W))

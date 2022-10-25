@@ -156,6 +156,7 @@ object VexAXIConfig {
 class VexAXICore(val config: VexAXIConfig) extends Component {
 
   import config._
+  import VexInterfaceConfig._
 
   val debug = true
   val interruptCount = 4

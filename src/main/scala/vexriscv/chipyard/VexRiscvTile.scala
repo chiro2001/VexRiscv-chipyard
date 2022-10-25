@@ -302,7 +302,9 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
       out.aw.valid := core.io.io_dBus_arw_valid & core.io.io_dBus_arw_payload_write
       out.aw.bits.id := 0.U
       out.aw.bits.addr := core.io.io_dBus_arw_payload_addr
-      out.aw.bits.len := core.io.io_dBus_arw_payload_len
+      if (core.io.io_dBus_arw_payload_len.nonEmpty)
+        out.aw.bits.len := core.io.io_dBus_arw_payload_len.get
+      else out.aw.bits.len := 0.U
       out.aw.bits.size := core.io.io_dBus_arw_payload_size
       out.aw.bits.burst := "b01".U
       out.aw.bits.lock := "b00".U
@@ -369,9 +371,13 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
       out.ar.valid := core.io.io_iBus_ar_valid
       out.ar.bits.id := 0.U
       out.ar.bits.addr := core.io.io_iBus_ar_payload_addr
-      out.ar.bits.len := core.io.io_iBus_ar_payload_len
+      if (core.io.io_iBus_ar_payload_len.nonEmpty)
+        out.ar.bits.len := core.io.io_iBus_ar_payload_len.get
+      else out.ar.bits.len := 0.U
       out.ar.bits.size := "b010".U
-      out.ar.bits.burst := core.io.io_iBus_ar_payload_burst
+      if (core.io.io_iBus_ar_payload_burst.nonEmpty)
+        out.ar.bits.burst := core.io.io_iBus_ar_payload_burst.get
+      else out.ar.bits.burst := "b01".U
       out.ar.bits.lock := "b00".U
       out.ar.bits.cache := core.io.io_iBus_ar_payload_cache
       out.ar.bits.prot := core.io.io_iBus_ar_payload_prot
