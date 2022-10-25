@@ -12,7 +12,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 
 object VexInterfaceConfig {
-  def useRvfi = true
+  // def useRvfi = true
+  def useRvfi = false
 
   def useSimpleIBusExpected = true
 
@@ -53,14 +54,12 @@ object VexAXIConfig {
     catchUnaligned = true
   )
 
-  // val (useSimpleIBus, useSimpleDBus) = (false, false)
-  // val (useSimpleIBus, useSimpleDBus) = (true, true)
-
   import VexInterfaceConfig._
 
   val resetVector = 0x10000L
 
   val basePlugins = ArrayBuffer(
+    // new HaltOnExceptionPlugin,
     if (!useSimpleIBus) new IBusCachedPlugin(
       resetVector = resetVector,
       prediction = STATIC,
@@ -82,8 +81,8 @@ object VexAXIConfig {
       // )
     )
     else new DBusSimplePlugin(
-      catchAddressMisaligned = true,
-      catchAccessFault = true
+      catchAddressMisaligned = false,
+      catchAccessFault = false
     ),
     new StaticMemoryTranslatorPlugin(
       ioRange = _ (31 downto 28) === 0xF
@@ -104,6 +103,28 @@ object VexAXIConfig {
     new FullBarrelShifterPlugin,
     new MulPlugin,
     new DivPlugin,
+    // new CsrPlugin(config = CsrPluginConfig(
+    //   catchIllegalAccess = true,
+    //   mvendorid = 11,
+    //   marchid = 22,
+    //   mimpid = 33,
+    //   mhartid = 0,
+    //   misaExtensionsInit = 66,
+    //   misaAccess = CsrAccess.READ_WRITE,
+    //   mtvecAccess = CsrAccess.READ_WRITE,
+    //   mtvecInit = 0x80000020L,
+    //   mepcAccess = CsrAccess.READ_WRITE,
+    //   mscratchGen = true,
+    //   mcauseAccess = CsrAccess.READ_WRITE,
+    //   mbadaddrAccess = CsrAccess.READ_WRITE,
+    //   mcycleAccess = CsrAccess.READ_WRITE,
+    //   minstretAccess = CsrAccess.READ_WRITE,
+    //   ecallGen = true,
+    //   wfiGenAsWait = true,
+    //   ucycleAccess = CsrAccess.READ_ONLY,
+    //   uinstretAccess = CsrAccess.READ_ONLY
+    // )),
+    new DebugPlugin(ClockDomain.current.clone(reset = Bool().setName("debugReset"))),
     new HazardSimplePlugin(
       bypassExecute = true,
       bypassMemory = true,
@@ -118,32 +139,9 @@ object VexAXIConfig {
       catchAddressMisaligned = true
     ),
   )
-
-  if (!useRvfi) {
-    basePlugins.append(new CsrPlugin(
-      config = CsrPluginConfig(
-        catchIllegalAccess = false,
-        mvendorid = null,
-        marchid = null,
-        mimpid = null,
-        mhartid = null,
-        misaExtensionsInit = 66,
-        misaAccess = CsrAccess.NONE,
-        mtvecAccess = CsrAccess.NONE,
-        mtvecInit = 0x80000020L,
-        mepcAccess = CsrAccess.READ_WRITE,
-        mscratchGen = false,
-        mcauseAccess = CsrAccess.READ_ONLY,
-        mbadaddrAccess = CsrAccess.READ_ONLY,
-        mcycleAccess = CsrAccess.NONE,
-        minstretAccess = CsrAccess.NONE,
-        ecallGen = false,
-        wfiGenAsWait = false,
-        ucycleAccess = CsrAccess.NONE,
-        uinstretAccess = CsrAccess.NONE
-      )))
-  } else {
-    Seq(new FormalPlugin, new HaltOnExceptionPlugin).foreach(plugin => basePlugins.append(plugin))
+  if (useRvfi) {
+    basePlugins.append(new FormalPlugin)
+    // basePlugins.append(new SimpleFormalPlugin)
   }
 
   def default =
@@ -232,7 +230,7 @@ class VexAXICore(val config: VexAXIConfig) extends Component {
       }
       case plugin: DBusCachedPlugin => {
         println("dBus use cached AXI")
-        dBus = plugin.dBus.toAxi4Shared(true)
+        dBus = plugin.dBus.toAxi4Shared(stageCmd = true)
       }
       case plugin: CsrPlugin => {
         plugin.externalInterrupt := BufferCC(io.coreInterrupt)

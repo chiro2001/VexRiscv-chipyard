@@ -5,6 +5,7 @@ import spinal.core._
 import spinal.core.internals.Literal
 import spinal.lib._
 import vexriscv.demo.GenFull
+import vexriscv.plugin.DecoderSimplePlugin._
 
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
@@ -44,6 +45,12 @@ case class Masked(value : BigInt,care : BigInt){
   def toString(bitCount : Int) = (0 until bitCount).map(i => if(care.testBit(i)) (if(value.testBit(i)) "1" else "0") else "-").reverseIterator.reduce(_+_)
 }
 
+object DecoderSimplePlugin {
+  var initDone = false
+  var initDefaultDone = false
+  var buildDone = false
+}
+
 class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
                           throwIllegalInstruction : Boolean = false,
                           assertIllegalInstruction : Boolean = false,
@@ -52,6 +59,11 @@ class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
                           stupidDecoder : Boolean = false) extends Plugin[VexRiscv] with DecoderService {
   override def add(encoding: Seq[(MaskedLiteral, Seq[(Stageable[_ <: BaseType], Any)])]): Unit = encoding.foreach(e => this.add(e._1,e._2))
   override def add(key: MaskedLiteral, values: Seq[(Stageable[_ <: BaseType], Any)]): Unit = {
+    if (buildDone && !initDone) {
+      encodings.clear()
+      initDone = true
+    }
+    println(s"add = ${key}, ${values}")
     val instructionModel = encodings.getOrElseUpdate(key,ArrayBuffer[(Stageable[_ <: BaseType], BaseType)]())
     values.map{case (a,b) => {
       assert(!instructionModel.contains(a), s"Over specification of $a")
@@ -64,6 +76,11 @@ class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
   }
 
   override def addDefault(key: Stageable[_  <: BaseType], value: Any): Unit = {
+    if (buildDone && !initDefaultDone) {
+      defaults.clear()
+      initDefaultDone = true
+    }
+    if (defaults.contains(key)) defaults.clear()
     assert(!defaults.contains(key))
     defaults(key) = value match{
       case e : SpinalEnumElement[_] => e()
@@ -74,11 +91,12 @@ class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
   def forceIllegal() : Unit = if(catchIllegalInstruction) pipeline.decode.input(pipeline.config.LEGAL_INSTRUCTION) := False
 
   val defaults = mutable.LinkedHashMap[Stageable[_ <: BaseType], BaseType]()
-  val encodings = mutable.LinkedHashMap[MaskedLiteral,ArrayBuffer[(Stageable[_ <: BaseType], BaseType)]]()
+  var encodings = mutable.LinkedHashMap[MaskedLiteral,ArrayBuffer[(Stageable[_ <: BaseType], BaseType)]]()
   var decodeExceptionPort : Flow[ExceptionCause] = null
 
 
   override def setup(pipeline: VexRiscv): Unit = {
+    println(s"setup()! with encodings=${encodings}")
     if(!catchIllegalInstruction) {
       SpinalWarning("This VexRiscv configuration is set without illegal instruction catch support. Some software may rely on it (ex: Rust)")
     }
@@ -93,6 +111,7 @@ class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
   object ASSERT_ERROR extends Stageable(Bool)
 
   override def build(pipeline: VexRiscv): Unit = {
+    println("build()!")
     import pipeline.config._
     import pipeline.decode._
 
@@ -139,11 +158,16 @@ class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
         offset += e.dataType.getBitsWidth
       })
 
+      println(s"encodings(0) = ${encodings.head}")
+      println(encodings.map { case (key, values) =>
+        values.map(v => v._2)
+      }.filter(l => l.nonEmpty).head)
       //Build spec
       val spec = encodings.map { case (key, values) =>
         var decodedValue = defaultValue
         var decodedCare = defaultCare
         for ((e, literal) <- values) {
+          // println(s"literal = ${literal}")
           literal.head.source match {
             case literal: EnumLiteral[_] => literal.fixEncoding(e.dataType.asInstanceOf[SpinalEnumCraft[_]].getEncoding)
             case _ =>
@@ -155,6 +179,7 @@ class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
         (Masked(key.value, key.careAbout), Masked(decodedValue, decodedCare))
       }
 
+      buildDone = true
 
       // logic implementation
       val decodedBits = Bits(stageables.foldLeft(0)(_ + _.dataType.getBitsWidth) bits)

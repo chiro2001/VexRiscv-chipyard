@@ -15,7 +15,6 @@ import chisel3._
 import chisel3.util._
 import spinal.core.SpinalConfig
 import vexriscv.demo.{VexAXIConfig, VexInterfaceConfig}
-// import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 
 import scala.tools.nsc.io.File

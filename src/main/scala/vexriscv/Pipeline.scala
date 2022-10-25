@@ -44,7 +44,11 @@ trait Pipeline {
 
   def build(): Unit ={
     plugins.foreach(_.pipeline = this.asInstanceOf[T])
-    plugins.foreach(_.setup(this.asInstanceOf[T]))
+    // plugins.foreach(_.setup(this.asInstanceOf[T]))
+    plugins.foreach(p => {
+      println(s"setting up ${p}")
+      p.setup(this.asInstanceOf[T])
+    })
 
     plugins.foreach{ p =>
       p.parentScope = Component.current.dslBody //Put the given plugin as a child of the current component

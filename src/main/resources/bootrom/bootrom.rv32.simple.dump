@@ -1,0 +1,48 @@
+
+bootrom.rv32.simple.elf:     file format elf32-littleriscv
+
+
+Disassembly of section .text.start:
+
+00010000 <_start>:
+   10000:	020005b7          	lui	a1,0x2000
+   10004:	00800513          	li	a0,8
+   10008:	30451073          	csrw	mie,a0
+   1000c:	30052073          	csrs	mstatus,a0
+   10010:	00000517          	auipc	a0,0x0
+   10014:	07050513          	addi	a0,a0,112 # 10080 <_hang80>
+   10018:	30551073          	csrw	mtvec,a0
+
+0001001c <wfi_loop>:
+   1001c:	10500073          	wfi
+   10020:	ffdff06f          	j	1001c <wfi_loop>
+
+Disassembly of section .text.hang80:
+
+00010080 <_hang80>:
+   10080:	0040006f          	j	10084 <_hang>
+
+00010084 <_hang>:
+   10084:	0140006f          	j	10098 <boot_core_hart0>
+
+00010088 <boot_core>:
+   10088:	0005a283          	lw	t0,0(a1) # 2000000 <_dtb+0x1feff40>
+   1008c:	fe029ee3          	bnez	t0,10088 <boot_core>
+   10090:	00251513          	slli	a0,a0,0x2
+   10094:	00b505b3          	add	a1,a0,a1
+
+00010098 <boot_core_hart0>:
+   10098:	0005a023          	sw	zero,0(a1)
+   1009c:	00004537          	lui	a0,0x4
+   100a0:	00052503          	lw	a0,0(a0) # 4000 <ROM_BASE-0xc000>
+   100a4:	34151073          	csrw	mepc,a0
+   100a8:	f1402573          	csrr	a0,mhartid
+   100ac:	00000597          	auipc	a1,0x0
+   100b0:	01458593          	addi	a1,a1,20 # 100c0 <_dtb>
+   100b4:	08000613          	li	a2,128
+   100b8:	30063073          	csrc	mstatus,a2
+   100bc:	30200073          	mret
+
+000100c0 <_dtb>:
+   100c0:	0000                	unimp
+	...
