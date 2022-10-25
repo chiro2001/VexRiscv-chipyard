@@ -119,31 +119,30 @@ object VexAXIConfig {
     ),
   )
 
-  if (!useRvfi) {
-    basePlugins.append(new CsrPlugin(
-      config = CsrPluginConfig(
-        catchIllegalAccess = false,
-        mvendorid = null,
-        marchid = null,
-        mimpid = null,
-        mhartid = null,
-        misaExtensionsInit = 66,
-        misaAccess = CsrAccess.NONE,
-        mtvecAccess = CsrAccess.NONE,
-        mtvecInit = 0x80000020L,
-        mepcAccess = CsrAccess.READ_WRITE,
-        mscratchGen = false,
-        mcauseAccess = CsrAccess.READ_ONLY,
-        mbadaddrAccess = CsrAccess.READ_ONLY,
-        mcycleAccess = CsrAccess.NONE,
-        minstretAccess = CsrAccess.NONE,
-        ecallGen = false,
-        wfiGenAsWait = false,
-        ucycleAccess = CsrAccess.NONE,
-        uinstretAccess = CsrAccess.NONE
-      )))
-  } else {
-    Seq(new FormalPlugin, new HaltOnExceptionPlugin).foreach(plugin => basePlugins.append(plugin))
+  basePlugins.append(new CsrPlugin(
+    config = CsrPluginConfig(
+      catchIllegalAccess = false,
+      mvendorid = null,
+      marchid = null,
+      mimpid = null,
+      mhartid = null,
+      misaExtensionsInit = 66,
+      misaAccess = CsrAccess.NONE,
+      mtvecAccess = CsrAccess.NONE,
+      mtvecInit = 0x80000020L,
+      mepcAccess = CsrAccess.READ_WRITE,
+      mscratchGen = false,
+      mcauseAccess = CsrAccess.READ_ONLY,
+      mbadaddrAccess = CsrAccess.READ_ONLY,
+      mcycleAccess = CsrAccess.NONE,
+      minstretAccess = CsrAccess.NONE,
+      ecallGen = false,
+      wfiGenAsWait = false,
+      ucycleAccess = CsrAccess.NONE,
+      uinstretAccess = CsrAccess.NONE
+    )))
+  if (useRvfi) {
+    basePlugins.append(new SimpleFormalPlugin)
   }
 
   def default =

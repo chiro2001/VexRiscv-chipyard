@@ -64,7 +64,7 @@ class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
   }
 
   override def addDefault(key: Stageable[_  <: BaseType], value: Any): Unit = {
-    assert(!defaults.contains(key))
+    assert(!defaults.contains(key), s"$key has defined as ${defaults(key)}! you want to set to $value")
     defaults(key) = value match{
       case e : SpinalEnumElement[_] => e()
       case e : BaseType => e
