@@ -225,7 +225,7 @@ class VexRiscvTile private
     // msip := interrupts(1)
     // mtip := interrupts(2)
     // m_s_eip := Cat(interrupts(4), interrupts(3))
-    ints := interrupts.asUInt
+    ints := interrupts(1)
   }
 }
 

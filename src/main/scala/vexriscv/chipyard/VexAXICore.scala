@@ -131,13 +131,10 @@ trait VexRiscvCoreIODMem extends Bundle {
 }
 
 trait VexRiscvCoreIOJtag extends Bundle {
-  // -- JTAG I/F
-  val trst_n = Input(Bool())
   val tck = Input(Bool())
   val tms = Input(Bool())
   val tdi = Input(Bool())
   val tdo = Output(Bool())
-  val tdo_en = Output(Bool())
 }
 
 trait VexRiscvCoreIOIRQ

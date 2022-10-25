@@ -1,9 +1,24 @@
 #define BOOTADDR_REG 0x4000
+#define UARTPORT 0x54000000
 
 // boot all cores (only hart 0) and jump to main program execution
 .section .text.start, "ax", @progbits
 .globl _start
 _start:
+  /* print "START\n" */
+	lui a0,UARTPORT>>12
+	addi a1,zero,'S'
+	addi a2,zero,'T'
+	addi a3,zero,'A'
+	addi a4,zero,'R'
+	addi a5,zero,'T'
+	addi a6,zero,'\n'
+	sw a1,0(a0)
+	sw a2,0(a0)
+	sw a3,0(a0)
+	sw a4,0(a0)
+	sw a5,0(a0)
+	sw a6,0(a0)
   li a1, 0x2000000 // base address of clint
   li a0, 8               // MIE or MSIP bit
   csrw mie, a0           // set only MSIP in MIE CSR

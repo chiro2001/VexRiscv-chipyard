@@ -12,11 +12,11 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 
 object VexInterfaceConfig {
-  def useRvfi = true
-
-  def useSimpleIBusExpected = true
-
-  def useSimpleDBusExpected = true
+  val useRvfi = true
+  val useSimpleIBusExpected = true
+  val useSimpleDBusExpected = true
+  val debug = false
+  val resetVector = 0x10000L
 
   def useSimpleIBus = if (!useRvfi) useSimpleIBusExpected else true
 
@@ -53,12 +53,7 @@ object VexAXIConfig {
     catchUnaligned = true
   )
 
-  // val (useSimpleIBus, useSimpleDBus) = (false, false)
-  // val (useSimpleIBus, useSimpleDBus) = (true, true)
-
   import VexInterfaceConfig._
-
-  val resetVector = 0x10000L
 
   val basePlugins = ArrayBuffer(
     if (!useSimpleIBus) new IBusCachedPlugin(
@@ -121,26 +116,45 @@ object VexAXIConfig {
 
   basePlugins.append(new CsrPlugin(
     config = CsrPluginConfig(
-      catchIllegalAccess = false,
-      mvendorid = null,
-      marchid = null,
-      mimpid = null,
-      mhartid = null,
-      misaExtensionsInit = 66,
-      misaAccess = CsrAccess.NONE,
-      mtvecAccess = CsrAccess.NONE,
-      mtvecInit = 0x80000020L,
+      catchIllegalAccess = true,
+      mvendorid = 1,
+      marchid = 2,
+      mimpid = 3,
+      mhartid = 0,
+      misaExtensionsInit = 0, // raw is 66
+      misaAccess = CsrAccess.READ_WRITE,
+      mtvecAccess = CsrAccess.READ_WRITE,
+      mtvecInit = 0x80000080L,
       mepcAccess = CsrAccess.READ_WRITE,
-      mscratchGen = false,
-      mcauseAccess = CsrAccess.READ_ONLY,
-      mbadaddrAccess = CsrAccess.READ_ONLY,
-      mcycleAccess = CsrAccess.NONE,
-      minstretAccess = CsrAccess.NONE,
-      ecallGen = false,
-      wfiGenAsWait = false,
-      ucycleAccess = CsrAccess.NONE,
-      uinstretAccess = CsrAccess.NONE
-    )))
+      mscratchGen = true,
+      mcauseAccess = CsrAccess.READ_WRITE,
+      mbadaddrAccess = CsrAccess.READ_WRITE,
+      mcycleAccess = CsrAccess.READ_WRITE,
+      minstretAccess = CsrAccess.READ_WRITE,
+      ucycleAccess = CsrAccess.READ_ONLY,
+      uinstretAccess = CsrAccess.READ_ONLY,
+      wfiGenAsWait = true,
+      ecallGen = true,
+      xtvecModeGen = false,
+      noCsrAlu = false,
+      wfiGenAsNop = false,
+      ebreakGen = false,
+      userGen = true,
+      supervisorGen = false,
+      sscratchGen = true,
+      stvecAccess = CsrAccess.READ_WRITE,
+      sepcAccess = CsrAccess.READ_WRITE,
+      scauseAccess = CsrAccess.READ_WRITE,
+      sbadaddrAccess = CsrAccess.READ_WRITE,
+      scycleAccess = CsrAccess.READ_WRITE,
+      sinstretAccess = CsrAccess.READ_WRITE,
+      satpAccess = CsrAccess.NONE, //Implemented into the MMU plugin
+      medelegAccess = CsrAccess.READ_WRITE,
+      midelegAccess = CsrAccess.READ_WRITE,
+      pipelineCsrRead = false,
+      deterministicInteruptionEntry = false
+    )
+  ))
   if (useRvfi) {
     basePlugins.append(new SimpleFormalPlugin)
   }
@@ -154,10 +168,9 @@ object VexAXIConfig {
 
 class VexAXICore(val config: VexAXIConfig) extends Component {
 
-  import config._
   import VexInterfaceConfig._
+  import config._
 
-  val debug = true
   val interruptCount = 4
 
   val io = new Bundle {
@@ -212,6 +225,7 @@ class VexAXICore(val config: VexAXIConfig) extends Component {
   )
 
   val core = new Area {
+    // val vexConfig = VexRiscvConfig(plugins = if (debug) cpuPlugins ++ Seq(new DebugPlugin(debugClockDomain)) else cpuPlugins)
     val vexConfig = VexRiscvConfig(plugins = cpuPlugins)
     val cpu = new VexRiscv(vexConfig)
     var iBus: Axi4ReadOnly = null
@@ -231,7 +245,7 @@ class VexAXICore(val config: VexAXIConfig) extends Component {
       }
       case plugin: DBusCachedPlugin => {
         println("dBus use cached AXI")
-        dBus = plugin.dBus.toAxi4Shared(true)
+        dBus = plugin.dBus.toAxi4Shared(stageCmd = true)
       }
       case plugin: CsrPlugin => {
         plugin.externalInterrupt := BufferCC(io.coreInterrupt)
@@ -239,7 +253,7 @@ class VexAXICore(val config: VexAXIConfig) extends Component {
         // plugin.timerInterrupt := timerCtrl.io.interrupt
         plugin.timerInterrupt := False
       }
-      // case plugin: DebugPlugin => debugClockDomain {
+      // case plugin: DebugPlugin => plugin.debugClockDomain {
       //   resetCtrl.axiReset setWhen (RegNext(plugin.io.resetOut))
       //   io.jtag <> plugin.io.bus.fromJtag()
       // }

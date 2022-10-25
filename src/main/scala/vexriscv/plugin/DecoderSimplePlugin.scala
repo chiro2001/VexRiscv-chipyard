@@ -44,14 +44,25 @@ case class Masked(value : BigInt,care : BigInt){
   def toString(bitCount : Int) = (0 until bitCount).map(i => if(care.testBit(i)) (if(value.testBit(i)) "1" else "0") else "-").reverseIterator.reduce(_+_)
 }
 
+object DecoderSimplePlugin {
+  var buildDone = false
+  var initDone = false
+  var initDefaultsDone = false
+}
+
 class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
                           throwIllegalInstruction : Boolean = false,
                           assertIllegalInstruction : Boolean = false,
                           forceLegalInstructionComputation : Boolean = false,
                           decoderIsolationBench : Boolean = false,
                           stupidDecoder : Boolean = false) extends Plugin[VexRiscv] with DecoderService {
+  import DecoderSimplePlugin._
   override def add(encoding: Seq[(MaskedLiteral, Seq[(Stageable[_ <: BaseType], Any)])]): Unit = encoding.foreach(e => this.add(e._1,e._2))
   override def add(key: MaskedLiteral, values: Seq[(Stageable[_ <: BaseType], Any)]): Unit = {
+    if (buildDone && !initDone) {
+      encodings.clear()
+      initDone = true
+    }
     val instructionModel = encodings.getOrElseUpdate(key,ArrayBuffer[(Stageable[_ <: BaseType], BaseType)]())
     values.map{case (a,b) => {
       assert(!instructionModel.contains(a), s"Over specification of $a")
@@ -64,6 +75,10 @@ class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
   }
 
   override def addDefault(key: Stageable[_  <: BaseType], value: Any): Unit = {
+    if (buildDone && !initDefaultsDone) {
+      defaults.clear()
+      initDefaultsDone = true
+    }
     assert(!defaults.contains(key), s"$key has defined as ${defaults(key)}! you want to set to $value")
     defaults(key) = value match{
       case e : SpinalEnumElement[_] => e()
@@ -192,6 +207,7 @@ class DecoderSimplePlugin(catchIllegalInstruction : Boolean = false,
       pipeline.stages.tail.foreach(s => s.output(ASSERT_ERROR) clearWhen(s.arbitration.isRemoved))
       assert(!pipeline.stages.last.output(ASSERT_ERROR))
     }
+    buildDone = true
   }
 
   def bench(toplevel : VexRiscv): Unit ={
