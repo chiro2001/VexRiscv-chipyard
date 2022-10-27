@@ -298,7 +298,6 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   require(outer.memAXI4Nodes.size == 2, "This core requires imem and dmem AXI ports!")
   outer.memAXI4Nodes(1).out.head match {
     case (out, edgeOut) =>
-      core.io.io_dBus_arw_ready := out.aw.ready
       out.aw.valid := core.io.io_dBus_arw_valid & core.io.io_dBus_arw_payload_write
       out.aw.bits.id := 0.U
       out.aw.bits.addr := core.io.io_dBus_arw_payload_addr
@@ -322,7 +321,7 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
       core.io.io_dBus_b_valid := out.b.valid
       core.io.io_dBus_b_payload_resp := out.b.bits.resp
 
-      core.io.io_dBus_arw_ready := out.ar.ready
+      core.io.io_dBus_arw_ready := Mux(core.io.io_dBus_arw_payload_write, out.aw.ready, out.ar.ready)
       out.ar.valid := core.io.io_dBus_arw_valid & !core.io.io_dBus_arw_payload_write
       out.ar.bits.id := 0.U
       out.ar.bits.addr := core.io.io_dBus_arw_payload_addr
