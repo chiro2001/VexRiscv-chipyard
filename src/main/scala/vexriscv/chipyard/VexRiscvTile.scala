@@ -266,6 +266,14 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
 
   // TODO: connect JTAG
   core.io.debugReset := reset.asBool
+  val j = core.io
+
+  import chisel3.util.experimental.BoringUtils._
+
+  addSink(j.jtag_tck, "jtag_TCK")
+  addSink(j.jtag_tms, "jtag_TMS")
+  addSink(j.jtag_tdi, "jtag_TDI")
+  addSource(j.jtag_tdo, "jtag_TDO")
 
   outer.connectVexRiscvInterrupts(core.io.softwareInterrupt, core.io.timerInterrupt, core.io.externalInterrupt)
 

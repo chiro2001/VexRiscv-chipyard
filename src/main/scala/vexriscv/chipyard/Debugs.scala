@@ -54,8 +54,12 @@ trait HasCoreInternalDebugModuleImp extends LazyModuleImp {
   val outer: HasCoreInternalDebug
 
   val jtag = noPrefix(outer.jtagBundle.map { jtagBundle => {
-    val j = IO(new VexJTAGChipIO)
-    j <> jtagBundle
+    val j = IO(jtagBundle)
+    import chisel3.util.experimental.BoringUtils._
+    addSource(j.TCK, "jtag_TCK")
+    addSource(j.TMS, "jtag_TMS")
+    addSource(j.TDI, "jtag_TDI")
+    addSink(j.TDO, "jtag_TDO")
     j
   }
   })
