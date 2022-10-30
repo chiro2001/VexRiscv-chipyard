@@ -32,7 +32,7 @@ case class VexRiscvCoreParams
   val useHypervisor: Boolean = false
   val useUser: Boolean = true
   val useSupervisor: Boolean = false
-  val useDebug: Boolean = true
+  val useDebug: Boolean = false
   val useAtomics: Boolean = true
   val useAtomicsOnlyForIO: Boolean = false // copied from Rocket
   val useCompressed: Boolean = true
