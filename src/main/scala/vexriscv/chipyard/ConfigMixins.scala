@@ -15,13 +15,14 @@ import freechips.rocketchip.tile._
  *
  * @param n amount of tiles to duplicate
  */
-class WithNVexRiscvCores(n: Int = 1, overrideIdOffset: Option[Int] = None) extends Config((site, here, up) => {
+class WithNVexRiscvCores(n: Int = 1, overrideIdOffset: Option[Int] = None, onChipRAM: Boolean = false) extends Config((site, here, up) => {
   case TilesLocated(InSubsystem) => {
+    if (onChipRAM) require(n == 1)
     val prev = up(TilesLocated(InSubsystem), site)
     val idOffset = overrideIdOffset.getOrElse(prev.size)
     (0 until n).map { i =>
       VexRiscvTileAttachParams(
-        tileParams = VexRiscvTileParams(hartId = i + idOffset, trace = true),
+        tileParams = VexRiscvTileParams(hartId = i + idOffset, trace = true, onChipRAM = onChipRAM),
         crossingParams = RocketCrossingParams()
       )
     } ++ prev

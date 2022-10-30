@@ -79,6 +79,7 @@ case class VexRiscvTileParams
 (name: Option[String] = Some("vexRiscv_tile"),
  hartId: Int = 0,
  trace: Boolean = false,
+ val onChipRAM: Boolean = false,
  val core: VexRiscvCoreParams = VexRiscvCoreParams()
 ) extends InstantiableTileParams[VexRiscvTile] {
   val beuAddr: Option[BigInt] = None
@@ -208,16 +209,6 @@ class VexRiscvTile private
     xbar := memAXI4Nodes.head
     xbar := memAXI4Nodes(1)
   }
-
-  // (tlMasterXbar.node
-  //   := memoryTap
-  //   := TLBuffer()
-  //   := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
-  //   := TLWidthWidget(beatBytes) // reduce size of TL
-  //   := AXI4ToTL() // convert to TL
-  //   := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
-  //   := AXI4Fragmenter() // deal with multi-beat xacts
-  //   := memAXI4Node)
 
   def connectVexRiscvInterrupts(msip: Bool, mtip: Bool, meip: Bool): Unit = {
     val (interrupts, _) = intSinkNode.in.head
