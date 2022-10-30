@@ -150,8 +150,6 @@ object VexAXIJTAGCore {
       //CPU instanciation
       val cpu = new VexRiscv(cpuConfig)
 
-      //CPU modifications to be an Avalon one
-      cpu.setDefinitionName("VexAXICore")
       cpu.rework {
         var iBus: Axi4ReadOnly = null
         for (plugin <- cpuConfig.plugins) plugin match {
@@ -200,7 +198,7 @@ object VexAXIJTAGCore {
           case _ =>
         }
       }
-      cpu
+      cpu.setDefinitionName("VexCore")
     }
   }
 }

@@ -258,7 +258,8 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   val traceInstSz = (new freechips.rocketchip.rocket.TracedInstruction).getWidth + 2
 
   // connect the vexRiscv core
-  val core = Module(new VexAXICore).suggestName("vexRiscv_core_inst")
+  val core: VexCore = Module(if (outer.vexRiscvParams.onChipRAM) new VexAXICorePart(outer.vexRiscvParams.onChipRAM) else new VexAXICoreFull(outer.vexRiscvParams.onChipRAM))
+    .suggestName("vexRiscv_core_inst")
 
   core.io.clk := clock
   core.io.reset := reset.asBool
@@ -295,44 +296,7 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   require(outer.memAXI4Nodes.size == 2, "This core requires imem and dmem AXI ports!")
   outer.memAXI4Nodes(1).out.head match {
     case (out, edgeOut) =>
-      out.aw.valid := core.io.dBus_aw_valid
-      out.aw.bits.id := 0.U
-      out.aw.bits.addr := core.io.dBus_aw_payload_addr
-      out.aw.bits.len := core.io.dBus_aw_payload_len
-      out.aw.bits.size := core.io.dBus_aw_payload_size
-      out.aw.bits.burst := core.io.dBus_aw_payload_burst
-      out.aw.bits.lock := core.io.dBus_aw_payload_lock
-      out.aw.bits.cache := core.io.dBus_aw_payload_cache
-      out.aw.bits.prot := core.io.dBus_aw_payload_prot
-      out.aw.bits.qos := core.io.dBus_aw_payload_qos
-
-      core.io.dBus_w_ready := out.w.ready
-      out.w.valid := core.io.dBus_w_valid
-      out.w.bits.data := core.io.dBus_w_payload_data
-      out.w.bits.strb := core.io.dBus_w_payload_strb
-      out.w.bits.last := core.io.dBus_w_payload_last
-
-      out.b.ready := core.io.dBus_b_ready
-      core.io.dBus_b_valid := out.b.valid
-      core.io.dBus_b_payload_resp := out.b.bits.resp
-
-      core.io.dBus_ar_ready := out.ar.ready
-      out.ar.valid := core.io.dBus_ar_valid
-      out.ar.bits.id := core.io.dBus_ar_payload_id
-      out.ar.bits.addr := core.io.dBus_ar_payload_addr
-      out.ar.bits.len := core.io.dBus_ar_payload_len
-      out.ar.bits.size := core.io.dBus_ar_payload_size
-      out.ar.bits.burst := core.io.dBus_ar_payload_burst
-      out.ar.bits.lock := core.io.dBus_ar_payload_lock
-      out.ar.bits.cache := core.io.dBus_ar_payload_cache
-      out.ar.bits.prot := core.io.dBus_ar_payload_prot
-      out.ar.bits.qos := core.io.dBus_ar_payload_qos
-
-      out.r.ready := core.io.dBus_r_ready
-      core.io.dBus_r_valid := out.r.valid
-      core.io.dBus_r_payload_data := out.r.bits.data
-      core.io.dBus_r_payload_resp := out.r.bits.resp
-      core.io.dBus_r_payload_last := out.r.bits.last
+      core.io.connectDMem(out)
   }
   outer.memAXI4Nodes.head.out.head match {
     case (out, edgeOut) =>
