@@ -258,7 +258,7 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   val traceInstSz = (new freechips.rocketchip.rocket.TracedInstruction).getWidth + 2
 
   // connect the vexRiscv core
-  val core: VexCore = Module(if (outer.vexRiscvParams.onChipRAM) new VexAXICorePart(outer.vexRiscvParams.onChipRAM) else new VexAXICoreFull(outer.vexRiscvParams.onChipRAM))
+  val core: VexCore = Module(new VexAXICoreFull(outer.vexRiscvParams.onChipRAM))
     .suggestName("vexRiscv_core_inst")
 
   core.io.clk := clock

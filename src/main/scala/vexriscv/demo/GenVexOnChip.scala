@@ -90,107 +90,106 @@ object VexOnChipConfig {
   }
 }
 
-case class VexOnChip(config: VexOnChipConfig) extends Component {
-  import config._
+object VexOnChip {
+  def apply(config: VexOnChipConfig): VexRiscv = {
+    import config._
 
-  //Clocks / reset
-  val reset = in Bool()
-  val clk = in Bool()
-
-  // Instantiate the CPU
-  val cpu = new VexRiscv(
-    config = VexRiscvConfig(
-      plugins = cpuPlugins += new DebugPlugin(ClockDomain.current.copy(reset = Bool().setName("debugReset")))
+    // Instantiate the CPU
+    val cpu = new VexRiscv(
+      config = VexRiscvConfig(
+        plugins = cpuPlugins += new DebugPlugin(ClockDomain.current.copy(reset = Bool().setName("debugReset")))
+      )
     )
-  )
 
-  cpu.rework {
-    var iBus: Axi4ReadOnly = null
-    var dBus: Axi4Shared = null
-    // var dBus: Axi4 = null
-    for (plugin <- cpu.plugins) plugin match {
-      case plugin: IBusSimplePlugin => {
-        plugin.iBus.setAsDirectionLess() //Unset IO properties of iBus
-        iBus = master(plugin.iBus.toAxi4ReadOnly().toFullConfig())
-          .setName("iBus")
-          .addTag(ClockDomainTag(ClockDomain.current)) //Specify a clock domain to the iBus (used by QSysify)
+    cpu.rework {
+      var iBus: Axi4ReadOnly = null
+      var dBus: Axi4Shared = null
+      // var dBus: Axi4 = null
+      for (plugin <- cpu.plugins) plugin match {
+        case plugin: IBusSimplePlugin =>
+          plugin.iBus.setAsDirectionLess() //Unset IO properties of iBus
+          iBus = master(plugin.iBus.toAxi4ReadOnly().toFullConfig())
+            .setName("iBus")
+            .addTag(ClockDomainTag(ClockDomain.current)) //Specify a clock domain to the iBus (used by QSysify)
+        case plugin: IBusCachedPlugin =>
+          plugin.iBus.setAsDirectionLess() //Unset IO properties of iBus
+          iBus = master(plugin.iBus.toAxi4ReadOnly().toFullConfig())
+            .setName("iBus")
+            .addTag(ClockDomainTag(ClockDomain.current)) //Specify a clock domain to the iBus (used by QSysify)
+        case plugin: DBusSimplePlugin =>
+          plugin.dBus.setAsDirectionLess()
+          dBus = plugin.dBus.toAxi4Shared().toFullConfig()
+            .addTag(ClockDomainTag(ClockDomain.current))
+        case plugin: DBusCachedPlugin =>
+          plugin.dBus.setAsDirectionLess()
+          dBus = plugin.dBus.toAxi4Shared(stageCmd = true).toFullConfig()
+            .addTag(ClockDomainTag(ClockDomain.current))
+        case plugin: DebugPlugin => plugin.debugClockDomain {
+          plugin.io.bus.setAsDirectionLess()
+          val jtag = slave(new Jtag())
+            .setName("jtag")
+          jtag <> plugin.io.bus.fromJtag()
+          plugin.io.resetOut
+            .addTag(ResetEmitterTag(plugin.debugClockDomain))
+            .parent = null //Avoid the io bundle to be interpreted as a QSys conduit
+        }
+        case _ =>
       }
-      case plugin: IBusCachedPlugin => {
-        plugin.iBus.setAsDirectionLess() //Unset IO properties of iBus
-        iBus = master(plugin.iBus.toAxi4ReadOnly().toFullConfig())
-          .setName("iBus")
-          .addTag(ClockDomainTag(ClockDomain.current)) //Specify a clock domain to the iBus (used by QSysify)
+      for (plugin <- cpu.plugins) plugin match {
+        case plugin: CsrPlugin => {
+          plugin.externalInterrupt
+            .addTag(InterruptReceiverTag(iBus, ClockDomain.current))
+          plugin.timerInterrupt
+            .addTag(InterruptReceiverTag(iBus, ClockDomain.current))
+        }
+        case _ =>
       }
-      case plugin: DBusSimplePlugin =>
-        plugin.dBus.setAsDirectionLess()
-        dBus = plugin.dBus.toAxi4Shared().toFullConfig()
-      case plugin: DBusCachedPlugin =>
-        plugin.dBus.setAsDirectionLess()
-        dBus = plugin.dBus.toAxi4Shared(stageCmd = true).toFullConfig()
-      case plugin: DebugPlugin => plugin.debugClockDomain {
-        plugin.io.bus.setAsDirectionLess()
-        val jtag = slave(new Jtag())
-          .setName("jtag")
-        jtag <> plugin.io.bus.fromJtag()
-        plugin.io.resetOut
-          .addTag(ResetEmitterTag(plugin.debugClockDomain))
-          .parent = null //Avoid the io bundle to be interpreted as a QSys conduit
-      }
-      case _ =>
+
+      val reqBus = dBus.copy()
+
+      val ram = Axi4SharedOnChipRam(
+        dataWidth = 32,
+        byteCount = onChipRamSize,
+        idWidth = 4
+      ).setName("onchip_name")
+
+
+      val axiCrossbar = Axi4CrossbarFactory()
+
+      axiCrossbar.addSlaves(
+        ram.io.axi -> (0x80000000L, onChipRamSize),
+        reqBus -> (0x00000000L, BigInt(0x80000000L))
+      )
+
+      axiCrossbar.addConnections(
+        dBus -> List(ram.io.axi, reqBus)
+      )
+
+      axiCrossbar.addPipelining(ram.io.axi)((crossbar, ctrl) => {
+        crossbar.sharedCmd.halfPipe() >> ctrl.sharedCmd
+        crossbar.writeData >/-> ctrl.writeData
+        crossbar.writeRsp << ctrl.writeRsp
+        crossbar.readRsp << ctrl.readRsp
+      })
+
+      axiCrossbar.addPipelining(reqBus)((cpu, crossbar) => {
+        cpu.sharedCmd >> crossbar.sharedCmd
+        cpu.writeData >> crossbar.writeData
+        cpu.writeRsp << crossbar.writeRsp
+        cpu.readRsp <-< crossbar.readRsp //Data cache directly use read responses without buffering, so pipeline it for FMax
+      })
+
+      axiCrossbar.build()
+
+      val reqBusFull = master(reqBus.toAxi4().setName("dBus"))
     }
-    for (plugin <- cpu.plugins) plugin match {
-      case plugin: CsrPlugin => {
-        plugin.externalInterrupt
-          .addTag(InterruptReceiverTag(iBus, ClockDomain.current))
-        plugin.timerInterrupt
-          .addTag(InterruptReceiverTag(iBus, ClockDomain.current))
-      }
-      case _ =>
-    }
-
-    val reqBus = dBus.copy()
-
-    val ram = Axi4SharedOnChipRam(
-      dataWidth = 32,
-      byteCount = onChipRamSize,
-      idWidth = 4
-    ).setName("onchip_name")
-
-
-    val axiCrossbar = Axi4CrossbarFactory()
-
-    axiCrossbar.addSlaves(
-      ram.io.axi -> (0x80000000L, onChipRamSize),
-      reqBus -> (0x00000000L, BigInt(0x80000000L))
-    )
-
-    axiCrossbar.addConnections(
-      dBus -> List(ram.io.axi, reqBus)
-    )
-
-    axiCrossbar.addPipelining(ram.io.axi)((crossbar, ctrl) => {
-      crossbar.sharedCmd.halfPipe() >> ctrl.sharedCmd
-      crossbar.writeData >/-> ctrl.writeData
-      crossbar.writeRsp << ctrl.writeRsp
-      crossbar.readRsp << ctrl.readRsp
-    })
-
-    axiCrossbar.addPipelining(reqBus)((cpu, crossbar) => {
-      cpu.sharedCmd >> crossbar.sharedCmd
-      cpu.writeData >> crossbar.writeData
-      cpu.writeRsp << crossbar.writeRsp
-      cpu.readRsp <-< crossbar.readRsp //Data cache directly use read responses without buffering, so pipeline it for FMax
-    })
-
-    axiCrossbar.build()
-
-    val reqBusFull = master(reqBus.toAxi4().setName("dBus"))
+    cpu
   }
 }
 
 object GenVexOnChip {
   def main(args: Array[String]): Unit = {
-    val name = if (args.size == 0) "VexCore" else args(0)
+    val name = if (args.isEmpty) "VexCore" else args(0)
     SpinalVerilog(VexOnChip(VexOnChipConfig.default).setDefinitionName(name))
   }
 }

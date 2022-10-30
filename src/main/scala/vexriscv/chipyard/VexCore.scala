@@ -309,7 +309,7 @@ trait VexRiscvCoreIOJtag extends Bundle {
   val jtag_tdi = Input(Bool())
   val jtag_tdo = Output(Bool())
   val debugReset = Input(Bool())
-  val debug_resetOut = Output(Bool())
+  // val debug_resetOut = Output(Bool())
 }
 
 trait VexRiscvCoreIOIRQ
