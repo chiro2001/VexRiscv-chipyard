@@ -219,13 +219,13 @@ class VexRiscvTile private
   //   := AXI4Fragmenter() // deal with multi-beat xacts
   //   := memAXI4Node)
 
-  def connectVexRiscvInterrupts(ints: UInt) {
-    val (interrupts, _) = intSinkNode.in(0)
+  def connectVexRiscvInterrupts(msip: Bool, mtip: Bool, meip: Bool): Unit = {
+    val (interrupts, _) = intSinkNode.in.head
     // debug := interrupts(0)
-    // msip := interrupts(1)
-    // mtip := interrupts(2)
+    msip := interrupts(1)
+    mtip := interrupts(2)
+    meip := interrupts(3)
     // m_s_eip := Cat(interrupts(4), interrupts(3))
-    ints := interrupts(1)
   }
 }
 
@@ -235,28 +235,31 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
 
   val debugBaseAddr = BigInt(0x0) // CONSTANT: based on default debug module
   val debugSz = BigInt(0x1000) // CONSTANT: based on default debug module
-  val tohostAddr = BigInt(0x80001000L) // CONSTANT: based on default sw (assume within extMem region)
-  val fromhostAddr = BigInt(0x80001040L) // CONSTANT: based on default sw (assume within extMem region)
 
   // have the main memory, bootrom, debug regions be executable
   val bootromParams = p(BootROMLocated(InSubsystem)).get
-  val executeRegionBases = Seq(p(ExtMem).get.master.base, bootromParams.address, debugBaseAddr, BigInt(0x0), BigInt(0x0))
-  val executeRegionSzs = Seq(p(ExtMem).get.master.size, BigInt(bootromParams.size), debugSz, BigInt(0x0), BigInt(0x0))
-  val executeRegionCnt = executeRegionBases.length
+  if (p(ExtMem).nonEmpty) {
+    val tohostAddr = BigInt(0x80001000L) // CONSTANT: based on default sw (assume within extMem region)
+    val fromhostAddr = BigInt(0x80001040L) // CONSTANT: based on default sw (assume within extMem region)
 
-  // have the main memory be cached, but don't cache tohost/fromhost addresses
-  // TODO: current cache subsystem can only support 1 cacheable region... so cache AFTER the tohost/fromhost addresses
-  val wordOffset = 0x40
-  val (cacheableRegionBases, cacheableRegionSzs) = if (true /* outer.vexRiscvParams.core.enableToFromHostCaching */ ) {
-    val bases = Seq(p(ExtMem).get.master.base, BigInt(0x0), BigInt(0x0), BigInt(0x0), BigInt(0x0))
-    val sizes = Seq(p(ExtMem).get.master.size, BigInt(0x0), BigInt(0x0), BigInt(0x0), BigInt(0x0))
-    (bases, sizes)
-  } else {
-    val bases = Seq(fromhostAddr + 0x40, p(ExtMem).get.master.base, BigInt(0x0), BigInt(0x0), BigInt(0x0))
-    val sizes = Seq(p(ExtMem).get.master.size - (fromhostAddr + 0x40 - p(ExtMem).get.master.base), tohostAddr - p(ExtMem).get.master.base, BigInt(0x0), BigInt(0x0), BigInt(0x0))
-    (bases, sizes)
+    val executeRegionBases = Seq(p(ExtMem).get.master.base, bootromParams.address, debugBaseAddr, BigInt(0x0), BigInt(0x0))
+    val executeRegionSzs = Seq(p(ExtMem).get.master.size, BigInt(bootromParams.size), debugSz, BigInt(0x0), BigInt(0x0))
+    val executeRegionCnt = executeRegionBases.length
+
+    // have the main memory be cached, but don't cache tohost/fromhost addresses
+    // TODO: current cache subsystem can only support 1 cacheable region... so cache AFTER the tohost/fromhost addresses
+    val wordOffset = 0x40
+    val (cacheableRegionBases, cacheableRegionSzs) = if (true /* outer.vexRiscvParams.core.enableToFromHostCaching */ ) {
+      val bases = Seq(p(ExtMem).get.master.base, BigInt(0x0), BigInt(0x0), BigInt(0x0), BigInt(0x0))
+      val sizes = Seq(p(ExtMem).get.master.size, BigInt(0x0), BigInt(0x0), BigInt(0x0), BigInt(0x0))
+      (bases, sizes)
+    } else {
+      val bases = Seq(fromhostAddr + 0x40, p(ExtMem).get.master.base, BigInt(0x0), BigInt(0x0), BigInt(0x0))
+      val sizes = Seq(p(ExtMem).get.master.size - (fromhostAddr + 0x40 - p(ExtMem).get.master.base), tohostAddr - p(ExtMem).get.master.base, BigInt(0x0), BigInt(0x0), BigInt(0x0))
+      (bases, sizes)
+    }
+    val cacheableRegionCnt = cacheableRegionBases.length
   }
-  val cacheableRegionCnt = cacheableRegionBases.length
 
   // Add 2 to account for the extra clock and reset included with each
   // instruction in the original trace port implementation. These have since
@@ -267,11 +270,12 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   val core = Module(new VexAXICore).suggestName("vexRiscv_core_inst")
 
   core.io.clk := clock
-  core.io.io_axiClk := clock
   core.io.reset := reset.asBool
-  core.io.io_asyncReset := reset.asBool
 
-  outer.connectVexRiscvInterrupts(core.io.io_coreInterrupt)
+  // TODO: connect JTAG
+  core.io.debugReset := reset.asBool
+
+  outer.connectVexRiscvInterrupts(core.io.softwareInterrupt, core.io.timerInterrupt, core.io.externalInterrupt)
 
   if (outer.vexRiscvParams.trace) {
     // unpack the trace io from a UInt into Vec(TracedInstructions)
@@ -279,18 +283,20 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
 
     // TODO: add tracer
     for (w <- 0 until outer.vexRiscvParams.core.retireWidth) {
-      outer.traceSourceNode.bundle(w).valid := core.io.io_rvfi_valid
-      outer.traceSourceNode.bundle(w).iaddr := core.io.io_rvfi_pc_rdata
-      outer.traceSourceNode.bundle(w).insn := core.io.io_rvfi_insn
-      outer.traceSourceNode.bundle(w).priv := 3.U
-      outer.traceSourceNode.bundle(w).exception := false.B
-      outer.traceSourceNode.bundle(w).interrupt := core.io.io_rvfi_intr
-      outer.traceSourceNode.bundle(w).cause := 0.U
-      outer.traceSourceNode.bundle(w).tval := 0.U
+      // outer.traceSourceNode.bundle(w).valid := core.io.io_rvfi_valid
+      // outer.traceSourceNode.bundle(w).iaddr := core.io.io_rvfi_pc_rdata
+      // outer.traceSourceNode.bundle(w).insn := core.io.io_rvfi_insn
+      // outer.traceSourceNode.bundle(w).priv := 3.U
+      // outer.traceSourceNode.bundle(w).exception := false.B
+      // outer.traceSourceNode.bundle(w).interrupt := core.io.io_rvfi_intr
+      // outer.traceSourceNode.bundle(w).cause := 0.U
+      // outer.traceSourceNode.bundle(w).tval := 0.U
+      outer.traceSourceNode.bundle := DontCare
+      outer.traceSourceNode.bundle foreach (t => t.valid := false.B)
     }
   } else {
     outer.traceSourceNode.bundle := DontCare
-    outer.traceSourceNode.bundle map (t => t.valid := false.B)
+    outer.traceSourceNode.bundle foreach (t => t.valid := false.B)
   }
 
   // connect the axi interface
@@ -298,94 +304,67 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   require(outer.memAXI4Nodes.size == 2, "This core requires imem and dmem AXI ports!")
   outer.memAXI4Nodes(1).out.head match {
     case (out, edgeOut) =>
-      out.aw.valid := core.io.io_dBus_arw_valid & core.io.io_dBus_arw_payload_write
+      out.aw.valid := core.io.dBus_aw_valid
       out.aw.bits.id := 0.U
-      out.aw.bits.addr := core.io.io_dBus_arw_payload_addr
-      if (core.io.io_dBus_arw_payload_len.nonEmpty)
-        out.aw.bits.len := core.io.io_dBus_arw_payload_len.get
-      else out.aw.bits.len := 0.U
-      out.aw.bits.size := core.io.io_dBus_arw_payload_size
-      out.aw.bits.burst := "b01".U
-      out.aw.bits.lock := "b00".U
-      out.aw.bits.cache := core.io.io_dBus_arw_payload_cache
-      out.aw.bits.prot := core.io.io_dBus_arw_payload_prot
-      out.aw.bits.qos := "b0000".U
+      out.aw.bits.addr := core.io.dBus_aw_payload_addr
+      out.aw.bits.len := core.io.dBus_aw_payload_len
+      out.aw.bits.size := core.io.dBus_aw_payload_size
+      out.aw.bits.burst := core.io.dBus_aw_payload_burst
+      out.aw.bits.lock := core.io.dBus_aw_payload_lock
+      out.aw.bits.cache := core.io.dBus_aw_payload_cache
+      out.aw.bits.prot := core.io.dBus_aw_payload_prot
+      out.aw.bits.qos := core.io.dBus_aw_payload_qos
 
-      core.io.io_dBus_w_ready := out.w.ready
-      out.w.valid := core.io.io_dBus_w_valid
-      out.w.bits.data := core.io.io_dBus_w_payload_data
-      out.w.bits.strb := core.io.io_dBus_w_payload_strb
-      out.w.bits.last := core.io.io_dBus_w_payload_last
+      core.io.dBus_w_ready := out.w.ready
+      out.w.valid := core.io.dBus_w_valid
+      out.w.bits.data := core.io.dBus_w_payload_data
+      out.w.bits.strb := core.io.dBus_w_payload_strb
+      out.w.bits.last := core.io.dBus_w_payload_last
 
-      out.b.ready := core.io.io_dBus_b_ready
-      core.io.io_dBus_b_valid := out.b.valid
-      core.io.io_dBus_b_payload_resp := out.b.bits.resp
+      out.b.ready := core.io.dBus_b_ready
+      core.io.dBus_b_valid := out.b.valid
+      core.io.dBus_b_payload_resp := out.b.bits.resp
 
-      core.io.io_dBus_arw_ready := Mux(core.io.io_dBus_arw_payload_write, out.aw.ready, out.ar.ready)
-      out.ar.valid := core.io.io_dBus_arw_valid & !core.io.io_dBus_arw_payload_write
-      out.ar.bits.id := 0.U
-      out.ar.bits.addr := core.io.io_dBus_arw_payload_addr
-      out.ar.bits.len := 0.U
-      out.ar.bits.size := core.io.io_dBus_arw_payload_size
-      out.ar.bits.burst := "b01".U
-      out.ar.bits.lock := "b00".U
-      out.ar.bits.cache := core.io.io_dBus_arw_payload_cache
-      out.ar.bits.prot := core.io.io_dBus_arw_payload_prot
-      out.ar.bits.qos := "b0000".U
+      core.io.dBus_ar_ready := out.ar.ready
+      out.ar.valid := core.io.dBus_ar_valid
+      out.ar.bits.id := core.io.dBus_ar_payload_id
+      out.ar.bits.addr := core.io.dBus_ar_payload_addr
+      out.ar.bits.len := core.io.dBus_ar_payload_len
+      out.ar.bits.size := core.io.dBus_ar_payload_size
+      out.ar.bits.burst := core.io.dBus_ar_payload_burst
+      out.ar.bits.lock := core.io.dBus_ar_payload_lock
+      out.ar.bits.cache := core.io.dBus_ar_payload_cache
+      out.ar.bits.prot := core.io.dBus_ar_payload_prot
+      out.ar.bits.qos := core.io.dBus_ar_payload_qos
 
-      out.r.ready := core.io.io_dBus_r_ready
-      core.io.io_dBus_r_valid := out.r.valid
-      core.io.io_dBus_r_payload_data := out.r.bits.data
-      core.io.io_dBus_r_payload_resp := out.r.bits.resp
-      core.io.io_dBus_r_payload_last := out.r.bits.last
+      out.r.ready := core.io.dBus_r_ready
+      core.io.dBus_r_valid := out.r.valid
+      core.io.dBus_r_payload_data := out.r.bits.data
+      core.io.dBus_r_payload_resp := out.r.bits.resp
+      core.io.dBus_r_payload_last := out.r.bits.last
   }
   outer.memAXI4Nodes.head.out.head match {
     case (out, edgeOut) =>
-      // core.io.io_iBus_arw_ready := out.aw.ready
-      // out.aw.valid := core.io.io_iBus_arw_valid
-      // out.aw.bits.id := 0.U
-      // out.aw.bits.addr := core.io.io_iBus_arw_payload_addr
-      // out.aw.bits.len := 0.U
-      // out.aw.bits.size := core.io.io_iBus_arw_payload_size
-      // out.aw.bits.burst := "b01".U
-      // out.aw.bits.lock := "b00".U
-      // out.aw.bits.cache := core.io.io_iBus_arw_payload_cache
-      // out.aw.bits.prot := core.io.io_iBus_arw_payload_prot
-      // out.aw.bits.qos := "b0000".U
       out.aw := DontCare
-
-      // core.io.io_iBus_w_ready := out.w.ready
-      // out.w.valid := core.io.io_iBus_w_valid
-      // out.w.bits.data := core.io.io_iBus_w_payload_data
-      // out.w.bits.strb := core.io.io_iBus_w_payload_strb
-      // out.w.bits.last := core.io.io_iBus_w_payload_last
       out.w := DontCare
-
-      // out.b.ready := core.io.io_iBus_b_ready
-      // core.io.io_iBus_b_valid := out.b.valid
-      // core.io.io_iBus_b_payload_resp := out.b.bits.resp
       out.b := DontCare
 
-      core.io.io_iBus_ar_ready := out.ar.ready
-      out.ar.valid := core.io.io_iBus_ar_valid
+      core.io.iBus_ar_ready := out.ar.ready
+      out.ar.valid := core.io.iBus_ar_valid
       out.ar.bits.id := 0.U
-      out.ar.bits.addr := core.io.io_iBus_ar_payload_addr
-      if (core.io.io_iBus_ar_payload_len.nonEmpty)
-        out.ar.bits.len := core.io.io_iBus_ar_payload_len.get
-      else out.ar.bits.len := 0.U
-      out.ar.bits.size := "b010".U
-      if (core.io.io_iBus_ar_payload_burst.nonEmpty)
-        out.ar.bits.burst := core.io.io_iBus_ar_payload_burst.get
-      else out.ar.bits.burst := "b01".U
-      out.ar.bits.lock := "b00".U
-      out.ar.bits.cache := core.io.io_iBus_ar_payload_cache
-      out.ar.bits.prot := core.io.io_iBus_ar_payload_prot
-      out.ar.bits.qos := "b0000".U
+      out.ar.bits.addr := core.io.iBus_ar_payload_addr
+      out.ar.bits.len := core.io.iBus_ar_payload_len
+      out.ar.bits.size := core.io.iBus_ar_payload_size
+      out.ar.bits.burst := core.io.iBus_ar_payload_burst
+      out.ar.bits.lock := core.io.iBus_ar_payload_lock
+      out.ar.bits.cache := core.io.iBus_ar_payload_cache
+      out.ar.bits.prot := core.io.iBus_ar_payload_prot
+      out.ar.bits.qos := core.io.iBus_ar_payload_qos
 
-      out.r.ready := core.io.io_iBus_r_ready
-      core.io.io_iBus_r_valid := out.r.valid
-      core.io.io_iBus_r_payload_data := out.r.bits.data
-      core.io.io_iBus_r_payload_resp := out.r.bits.resp
-      core.io.io_iBus_r_payload_last := out.r.bits.last
+      out.r.ready := core.io.iBus_r_ready
+      core.io.iBus_r_valid := out.r.valid
+      core.io.iBus_r_payload_data := out.r.bits.data
+      core.io.iBus_r_payload_resp := out.r.bits.resp
+      core.io.iBus_r_payload_last := out.r.bits.last
   }
 }

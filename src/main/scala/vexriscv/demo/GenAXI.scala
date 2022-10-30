@@ -12,10 +12,10 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 
 object VexInterfaceConfig {
-  val useRvfi = true
-  val useSimpleIBusExpected = true
-  val useSimpleDBusExpected = true
-  val debug = false
+  val useRvfi = false
+  val useSimpleIBusExpected = false
+  val useSimpleDBusExpected = false
+  val debug = true
   val resetVector = 0x10000L
 
   def useSimpleIBus = if (!useRvfi) useSimpleIBusExpected else true

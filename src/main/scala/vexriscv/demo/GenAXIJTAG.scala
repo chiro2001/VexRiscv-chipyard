@@ -9,23 +9,16 @@ import spinal.lib.eda.altera.{InterruptReceiverTag, QSysify, ResetEmitterTag}
 import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig}
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
+import VexInterfaceConfig._
+import vexriscv.demo.VexAXIJTAGCore.run
 
-/**
- * Created by spinalvm on 14.07.17.
- */
-//class VexRiscvAvalon(debugClockDomain : ClockDomain) extends Component{
-//
-//}
-
-
-object VexRiscvAxi4WithIntegratedJtag {
-  def main(args: Array[String]) {
+object VexAXIJTAGCore {
+  def run(): Unit = {
     val report = SpinalVerilog {
-
       //CPU configuration
       val cpuConfig = VexRiscvConfig(
         plugins = List(
-          new PcManagerSimplePlugin(0x00000000l, false),
+          new PcManagerSimplePlugin(resetVector, false),
           //          new IBusSimplePlugin(
           //            interfaceKeepData = false,
           //            catchAccessFault = false
@@ -34,7 +27,7 @@ object VexRiscvAxi4WithIntegratedJtag {
           //            catchAddressMisaligned = false,
           //            catchAccessFault = false
           //          ),
-          new IBusCachedPlugin(
+          if (!useSimpleIBus) new IBusCachedPlugin(
             prediction = STATIC,
             config = InstructionCacheConfig(
               cacheSize = 4096,
@@ -53,8 +46,11 @@ object VexRiscvAxi4WithIntegratedJtag {
             //            memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
             //              portTlbSize = 4
             //            )
+          ) else new IBusSimplePlugin(
+            resetVector = resetVector,
+            false, true
           ),
-          new DBusCachedPlugin(
+          if (!useSimpleDBus) new DBusCachedPlugin(
             config = new DataCacheConfig(
               cacheSize = 4096,
               bytePerLine = 32,
@@ -70,6 +66,9 @@ object VexRiscvAxi4WithIntegratedJtag {
             //            memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
             //              portTlbSize = 6
             //            )
+          ) else new DBusSimplePlugin(
+            catchAddressMisaligned = true,
+            catchAccessFault = true
           ),
           new StaticMemoryTranslatorPlugin(
             ioRange = _ (31 downto 28) === 0xF
@@ -98,32 +97,50 @@ object VexRiscvAxi4WithIntegratedJtag {
             pessimisticWriteRegFile = false,
             pessimisticAddressMatch = false
           ),
-          new DebugPlugin(ClockDomain.current.clone(reset = Bool().setName("debugReset"))),
+          new DebugPlugin(ClockDomain.current.copy(reset = Bool().setName("debugReset"))),
           new BranchPlugin(
             earlyBranch = false,
             catchAddressMisaligned = true
           ),
           new CsrPlugin(
             config = CsrPluginConfig(
-              catchIllegalAccess = false,
-              mvendorid = null,
-              marchid = null,
-              mimpid = null,
-              mhartid = null,
-              misaExtensionsInit = 66,
-              misaAccess = CsrAccess.NONE,
-              mtvecAccess = CsrAccess.NONE,
-              mtvecInit = 0x00000020l,
+              catchIllegalAccess = true,
+              mvendorid = 1,
+              marchid = 2,
+              mimpid = 3,
+              mhartid = 0,
+              misaExtensionsInit = 0, // raw is 66
+              misaAccess = CsrAccess.READ_WRITE,
+              mtvecAccess = CsrAccess.READ_WRITE,
+              mtvecInit = 0x80000080L,
               mepcAccess = CsrAccess.READ_WRITE,
-              mscratchGen = false,
-              mcauseAccess = CsrAccess.READ_ONLY,
-              mbadaddrAccess = CsrAccess.READ_ONLY,
-              mcycleAccess = CsrAccess.NONE,
-              minstretAccess = CsrAccess.NONE,
-              ecallGen = false,
-              wfiGenAsWait = false,
-              ucycleAccess = CsrAccess.NONE,
-              uinstretAccess = CsrAccess.NONE
+              mscratchGen = true,
+              mcauseAccess = CsrAccess.READ_WRITE,
+              mbadaddrAccess = CsrAccess.READ_WRITE,
+              mcycleAccess = CsrAccess.READ_WRITE,
+              minstretAccess = CsrAccess.READ_WRITE,
+              ucycleAccess = CsrAccess.READ_ONLY,
+              uinstretAccess = CsrAccess.READ_ONLY,
+              wfiGenAsWait = true,
+              ecallGen = true,
+              xtvecModeGen = false,
+              noCsrAlu = false,
+              wfiGenAsNop = false,
+              ebreakGen = false,
+              userGen = true,
+              supervisorGen = false,
+              sscratchGen = true,
+              stvecAccess = CsrAccess.READ_WRITE,
+              sepcAccess = CsrAccess.READ_WRITE,
+              scauseAccess = CsrAccess.READ_WRITE,
+              sbadaddrAccess = CsrAccess.READ_WRITE,
+              scycleAccess = CsrAccess.READ_WRITE,
+              sinstretAccess = CsrAccess.READ_WRITE,
+              satpAccess = CsrAccess.NONE, //Implemented into the MMU plugin
+              medelegAccess = CsrAccess.READ_WRITE,
+              midelegAccess = CsrAccess.READ_WRITE,
+              pipelineCsrRead = false,
+              deterministicInteruptionEntry = false
             )
           ),
           new YamlPlugin("cpu0.yaml")
@@ -134,32 +151,32 @@ object VexRiscvAxi4WithIntegratedJtag {
       val cpu = new VexRiscv(cpuConfig)
 
       //CPU modifications to be an Avalon one
-      cpu.setDefinitionName("VexRiscvAxi4")
+      cpu.setDefinitionName("VexAXICore")
       cpu.rework {
         var iBus: Axi4ReadOnly = null
         for (plugin <- cpuConfig.plugins) plugin match {
           case plugin: IBusSimplePlugin => {
             plugin.iBus.setAsDirectionLess() //Unset IO properties of iBus
             iBus = master(plugin.iBus.toAxi4ReadOnly().toFullConfig())
-              .setName("iBusAxi")
+              .setName("iBus")
               .addTag(ClockDomainTag(ClockDomain.current)) //Specify a clock domain to the iBus (used by QSysify)
           }
           case plugin: IBusCachedPlugin => {
             plugin.iBus.setAsDirectionLess() //Unset IO properties of iBus
             iBus = master(plugin.iBus.toAxi4ReadOnly().toFullConfig())
-              .setName("iBusAxi")
+              .setName("iBus")
               .addTag(ClockDomainTag(ClockDomain.current)) //Specify a clock domain to the iBus (used by QSysify)
           }
           case plugin: DBusSimplePlugin => {
             plugin.dBus.setAsDirectionLess()
             master(plugin.dBus.toAxi4Shared().toAxi4().toFullConfig())
-              .setName("dBusAxi")
+              .setName("dBus")
               .addTag(ClockDomainTag(ClockDomain.current))
           }
           case plugin: DBusCachedPlugin => {
             plugin.dBus.setAsDirectionLess()
             master(plugin.dBus.toAxi4Shared().toAxi4().toFullConfig())
-              .setName("dBusAxi")
+              .setName("dBus")
               .addTag(ClockDomainTag(ClockDomain.current))
           }
           case plugin: DebugPlugin => plugin.debugClockDomain {
@@ -186,4 +203,8 @@ object VexRiscvAxi4WithIntegratedJtag {
       cpu
     }
   }
+}
+
+object GenAXIJTAG extends App {
+  VexAXIJTAGCore.run()
 }

@@ -14,157 +14,164 @@ package vexriscv.chipyard
 import chisel3._
 import chisel3.util._
 import spinal.core.SpinalConfig
-import vexriscv.demo.{VexAXIConfig, VexInterfaceConfig}
+import vexriscv.demo.{VexAXIConfig, VexAXIJTAGCore, VexInterfaceConfig}
 // import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 
 import scala.tools.nsc.io.File
 
-//   output              io_rvfi_valid,
-//   output     [63:0]   io_rvfi_order,
-//   output     [31:0]   io_rvfi_insn,
-//   output              io_rvfi_trap,
-//   output              io_rvfi_halt,
-//   output              io_rvfi_intr,
-//   output     [31:0]   io_rvfi_pc_rdata,
-//   output     [31:0]   io_rvfi_pc_wdata,
 trait VexRiscvCoreIOIRvfi extends Bundle {
-  val io_rvfi_valid = Output(Bool())
-  val io_rvfi_order = Output(UInt((63 + 1).W))
-  val io_rvfi_insn = Output(UInt((31 + 1).W))
-  val io_rvfi_trap = Output(Bool())
-  val io_rvfi_halt = Output(Bool())
-  val io_rvfi_intr = Output(Bool())
-  val io_rvfi_pc_rdata = Output(UInt((31 + 1).W))
-  val io_rvfi_pc_wdata = Output(UInt((31 + 1).W))
+  val rvfi_valid = Output(Bool())
+  val rvfi_order = Output(UInt((63 + 1).W))
+  val rvfi_insn = Output(UInt((31 + 1).W))
+  val rvfi_trap = Output(Bool())
+  val rvfi_halt = Output(Bool())
+  val rvfi_intr = Output(Bool())
+  val rvfi_pc_rdata = Output(UInt((31 + 1).W))
+  val rvfi_pc_wdata = Output(UInt((31 + 1).W))
 }
-//   input               io_asyncReset,
-//   input               io_axiClk,
-//   input               io_coreInterrupt,
-//   output              io_iBus_ar_valid,
-//   input               io_iBus_ar_ready,
-//   output     [31:0]   io_iBus_ar_payload_addr,
-//   output     [3:0]    io_iBus_ar_payload_cache,
-//   output     [2:0]    io_iBus_ar_payload_prot,
-//   input               io_iBus_r_valid,
-//   output              io_iBus_r_ready,
-//   input      [31:0]   io_iBus_r_payload_data,
-//   input      [1:0]    io_iBus_r_payload_resp,
-//   input               io_iBus_r_payload_last,
-//   output              io_dBus_arw_valid,
-//   input               io_dBus_arw_ready,
-//   output     [31:0]   io_dBus_arw_payload_addr,
-//   output     [2:0]    io_dBus_arw_payload_size,
-//   output     [3:0]    io_dBus_arw_payload_cache,
-//   output     [2:0]    io_dBus_arw_payload_prot,
-//   output              io_dBus_arw_payload_write,
-//   output              io_dBus_w_valid,
-//   input               io_dBus_w_ready,
-//   output     [31:0]   io_dBus_w_payload_data,
-//   output     [3:0]    io_dBus_w_payload_strb,
-//   output              io_dBus_w_payload_last,
-//   input               io_dBus_b_valid,
-//   output              io_dBus_b_ready,
-//   input      [1:0]    io_dBus_b_payload_resp,
-//   input               io_dBus_r_valid,
-//   output              io_dBus_r_ready,
-//   input      [31:0]   io_dBus_r_payload_data,
-//   input      [1:0]    io_dBus_r_payload_resp,
-//   input               io_dBus_r_payload_last,
-//   input               clk,
-//   input               reset
 
 trait VexRiscvCoreIOIMem extends Bundle {
   // Instruction Memory Interface
-  val io_iBus_ar_valid = Output(Bool())
-  val io_iBus_ar_ready = Input(Bool())
-  val io_iBus_ar_payload_addr = Output(UInt((31 + 1).W))
-  val io_iBus_ar_payload_len = if (VexInterfaceConfig.useSimpleIBusExpected) None else Some(Output(UInt((7 + 1).W)))
-  val io_iBus_ar_payload_burst = if (VexInterfaceConfig.useSimpleIBusExpected) None else Some(Output(UInt((1 + 1).W)))
-  val io_iBus_ar_payload_cache = Output(UInt((3 + 1).W))
-  val io_iBus_ar_payload_prot = Output(UInt((2 + 1).W))
-  val io_iBus_r_valid = Input(Bool())
-  val io_iBus_r_ready = Output(Bool())
-  val io_iBus_r_payload_data = Input(UInt((31 + 1).W))
-  val io_iBus_r_payload_resp = Input(UInt((1 + 1).W))
-  val io_iBus_r_payload_last = Input(Bool())
-  //   output              io_iBus_ar_valid,
-  //   input               io_iBus_ar_ready,
-  //   output     [31:0]   io_iBus_ar_payload_addr,
-  //   output     [7:0]    io_iBus_ar_payload_len,
-  //   output     [1:0]    io_iBus_ar_payload_burst,
-  //   output     [3:0]    io_iBus_ar_payload_cache,
-  //   output     [2:0]    io_iBus_ar_payload_prot,
-  //   input               io_iBus_r_valid,
-  //   output              io_iBus_r_ready,
-  //   input      [31:0]   io_iBus_r_payload_data,
-  //   input      [1:0]    io_iBus_r_payload_resp,
-  //   input               io_iBus_r_payload_last,
+  val iBus_ar_valid = Output(Bool())
+  val iBus_ar_ready = Input(Bool())
+  val iBus_ar_payload_addr = Output(UInt((31 + 1).W))
+  val iBus_ar_payload_id = Output(Bool())
+  val iBus_ar_payload_region = Output(UInt(4.W))
+  val iBus_ar_payload_len = Output(UInt((7 + 1).W))
+  val iBus_ar_payload_size = Output(UInt(3.W))
+  val iBus_ar_payload_burst = Output(UInt((1 + 1).W))
+  val iBus_ar_payload_lock = Output(Bool())
+  val iBus_ar_payload_cache = Output(UInt((3 + 1).W))
+  val iBus_ar_payload_qos = Output(UInt((3 + 1).W))
+  val iBus_ar_payload_prot = Output(UInt((2 + 1).W))
+  val iBus_r_valid = Input(Bool())
+  val iBus_r_ready = Output(Bool())
+  val iBus_r_payload_data = Input(UInt((31 + 1).W))
+  val iBus_r_payload_id = Input(Bool())
+  val iBus_r_payload_resp = Input(UInt((1 + 1).W))
+  val iBus_r_payload_last = Input(Bool())
+  //   output              iBus_ar_valid,
+  //   input               iBus_ar_ready,
+  //   output     [31:0]   iBus_ar_payload_addr,
+  //   output     [0:0]    iBus_ar_payload_id,
+  //   output     [3:0]    iBus_ar_payload_region,
+  //   output     [7:0]    iBus_ar_payload_len,
+  //   output     [2:0]    iBus_ar_payload_size,
+  //   output     [1:0]    iBus_ar_payload_burst,
+  //   output     [0:0]    iBus_ar_payload_lock,
+  //   output     [3:0]    iBus_ar_payload_cache,
+  //   output     [3:0]    iBus_ar_payload_qos,
+  //   output     [2:0]    iBus_ar_payload_prot,
+  //   input               iBus_r_valid,
+  //   output              iBus_r_ready,
+  //   input      [31:0]   iBus_r_payload_data,
+  //   input      [0:0]    iBus_r_payload_id,
+  //   input      [1:0]    iBus_r_payload_resp,
+  //   input               iBus_r_payload_last,
 }
 
 trait VexRiscvCoreIODMem extends Bundle {
   // Data Memory Interface
-  val io_dBus_arw_valid = Output(Bool())
-  val io_dBus_arw_ready = Input(Bool())
-  val io_dBus_arw_payload_addr = Output(UInt((31 + 1).W))
-  val io_dBus_arw_payload_len = if (VexInterfaceConfig.useSimpleIBusExpected) None else Some(Output(UInt((7 + 1).W)))
-  val io_dBus_arw_payload_size = Output(UInt((2 + 1).W))
-  val io_dBus_arw_payload_cache = Output(UInt((3 + 1).W))
-  val io_dBus_arw_payload_prot = Output(UInt((2 + 1).W))
-  val io_dBus_arw_payload_write = Output(Bool())
-  val io_dBus_w_valid = Output(Bool())
-  val io_dBus_w_ready = Input(Bool())
-  val io_dBus_w_payload_data = Output(UInt((31 + 1).W))
-  val io_dBus_w_payload_strb = Output(UInt((3 + 1).W))
-  val io_dBus_w_payload_last = Output(Bool())
-  val io_dBus_b_valid = Input(Bool())
-  val io_dBus_b_ready = Output(Bool())
-  val io_dBus_b_payload_resp = Input(UInt((1 + 1).W))
-  val io_dBus_r_valid = Input(Bool())
-  val io_dBus_r_ready = Output(Bool())
-  val io_dBus_r_payload_data = Input(UInt((31 + 1).W))
-  val io_dBus_r_payload_resp = Input(UInt((1 + 1).W))
-  val io_dBus_r_payload_last = Input(Bool())
-  //   output              io_dBus_arw_valid,
-  //   input               io_dBus_arw_ready,
-  //   output     [31:0]   io_dBus_arw_payload_addr,
-  //   output     [7:0]    io_dBus_arw_payload_len,
-  //   output     [2:0]    io_dBus_arw_payload_size,
-  //   output     [3:0]    io_dBus_arw_payload_cache,
-  //   output     [2:0]    io_dBus_arw_payload_prot,
-  //   output              io_dBus_arw_payload_write,
-  //   output              io_dBus_w_valid,
-  //   input               io_dBus_w_ready,
-  //   output     [31:0]   io_dBus_w_payload_data,
-  //   output     [3:0]    io_dBus_w_payload_strb,
-  //   output              io_dBus_w_payload_last,
-  //   input               io_dBus_b_valid,
-  //   output              io_dBus_b_ready,
-  //   input      [1:0]    io_dBus_b_payload_resp,
-  //   input               io_dBus_r_valid,
-  //   output              io_dBus_r_ready,
-  //   input      [31:0]   io_dBus_r_payload_data,
-  //   input      [1:0]    io_dBus_r_payload_resp,
-  //   input               io_dBus_r_payload_last,
+  val dBus_aw_valid = Output(Bool())
+  val dBus_aw_ready = Input(Bool())
+  val dBus_aw_payload_addr = Output(UInt((31 + 1).W))
+  val dBus_aw_payload_id = Output(UInt((0 + 1).W))
+  val dBus_aw_payload_region = Output(UInt((3 + 1).W))
+  val dBus_aw_payload_len = Output(UInt((7 + 1).W))
+  val dBus_aw_payload_size = Output(UInt((2 + 1).W))
+  val dBus_aw_payload_burst = Output(UInt((1 + 1).W))
+  val dBus_aw_payload_lock = Output(UInt((0 + 1).W))
+  val dBus_aw_payload_cache = Output(UInt((3 + 1).W))
+  val dBus_aw_payload_qos = Output(UInt((3 + 1).W))
+  val dBus_aw_payload_prot = Output(UInt((2 + 1).W))
+  val dBus_w_valid = Output(Bool())
+  val dBus_w_ready = Input(Bool())
+  val dBus_w_payload_data = Output(UInt((31 + 1).W))
+  val dBus_w_payload_strb = Output(UInt((3 + 1).W))
+  val dBus_w_payload_last = Output(Bool())
+  val dBus_b_valid = Input(Bool())
+  val dBus_b_ready = Output(Bool())
+  val dBus_b_payload_id = Input(UInt((0 + 1).W))
+  val dBus_b_payload_resp = Input(UInt((1 + 1).W))
+  val dBus_ar_valid = Output(Bool())
+  val dBus_ar_ready = Input(Bool())
+  val dBus_ar_payload_addr = Output(UInt((31 + 1).W))
+  val dBus_ar_payload_id = Output(UInt((0 + 1).W))
+  val dBus_ar_payload_region = Output(UInt((3 + 1).W))
+  val dBus_ar_payload_len = Output(UInt((7 + 1).W))
+  val dBus_ar_payload_size = Output(UInt((2 + 1).W))
+  val dBus_ar_payload_burst = Output(UInt((1 + 1).W))
+  val dBus_ar_payload_lock = Output(UInt((0 + 1).W))
+  val dBus_ar_payload_cache = Output(UInt((3 + 1).W))
+  val dBus_ar_payload_qos = Output(UInt((3 + 1).W))
+  val dBus_ar_payload_prot = Output(UInt((2 + 1).W))
+  val dBus_r_valid = Input(Bool())
+  val dBus_r_ready = Output(Bool())
+  val dBus_r_payload_data = Input(UInt((31 + 1).W))
+  val dBus_r_payload_id = Input(UInt((0 + 1).W))
+  val dBus_r_payload_resp = Input(UInt((1 + 1).W))
+  val dBus_r_payload_last = Input(Bool())
+  //   output              dBus_aw_valid,
+  //   input               dBus_aw_ready,
+  //   output     [31:0]   dBus_aw_payload_addr,
+  //   output     [0:0]    dBus_aw_payload_id,
+  //   output     [3:0]    dBus_aw_payload_region,
+  //   output     [7:0]    dBus_aw_payload_len,
+  //   output     [2:0]    dBus_aw_payload_size,
+  //   output     [1:0]    dBus_aw_payload_burst,
+  //   output     [0:0]    dBus_aw_payload_lock,
+  //   output     [3:0]    dBus_aw_payload_cache,
+  //   output     [3:0]    dBus_aw_payload_qos,
+  //   output     [2:0]    dBus_aw_payload_prot,
+  //   output              dBus_w_valid,
+  //   input               dBus_w_ready,
+  //   output     [31:0]   dBus_w_payload_data,
+  //   output     [3:0]    dBus_w_payload_strb,
+  //   output              dBus_w_payload_last,
+  //   input               dBus_b_valid,
+  //   output              dBus_b_ready,
+  //   input      [0:0]    dBus_b_payload_id,
+  //   input      [1:0]    dBus_b_payload_resp,
+  //   output              dBus_ar_valid,
+  //   input               dBus_ar_ready,
+  //   output     [31:0]   dBus_ar_payload_addr,
+  //   output     [0:0]    dBus_ar_payload_id,
+  //   output     [3:0]    dBus_ar_payload_region,
+  //   output     [7:0]    dBus_ar_payload_len,
+  //   output     [2:0]    dBus_ar_payload_size,
+  //   output     [1:0]    dBus_ar_payload_burst,
+  //   output     [0:0]    dBus_ar_payload_lock,
+  //   output     [3:0]    dBus_ar_payload_cache,
+  //   output     [3:0]    dBus_ar_payload_qos,
+  //   output     [2:0]    dBus_ar_payload_prot,
+  //   input               dBus_r_valid,
+  //   output              dBus_r_ready,
+  //   input      [31:0]   dBus_r_payload_data,
+  //   input      [0:0]    dBus_r_payload_id,
+  //   input      [1:0]    dBus_r_payload_resp,
+  //   input               dBus_r_payload_last,
 }
 
 trait VexRiscvCoreIOJtag extends Bundle {
-  val tck = Input(Bool())
-  val tms = Input(Bool())
-  val tdi = Input(Bool())
-  val tdo = Output(Bool())
+  val jtag_tck = Input(Bool())
+  val jtag_tms = Input(Bool())
+  val jtag_tdi = Input(Bool())
+  val jtag_tdo = Output(Bool())
+  val debugReset = Input(Bool())
+  val debug_resetOut = Output(Bool())
 }
 
 trait VexRiscvCoreIOIRQ
   extends Bundle {
-  val io_coreInterrupt = Input(Bool())
+  val timerInterrupt = Input(Bool())
+  val externalInterrupt = Input(Bool())
+  val softwareInterrupt = Input(Bool())
 }
 
 trait VexRiscvCoreIOBase extends Bundle {
-  val io_asyncReset = Input(Bool())
   val reset = Input(Bool())
   val clk = Input(Clock()) // System clock
-  val io_axiClk = Input(Clock())
 }
 
 class VexRiscvCoreIO extends Bundle
@@ -172,7 +179,8 @@ class VexRiscvCoreIO extends Bundle
   with VexRiscvCoreIOIRQ
   with VexRiscvCoreIOIMem
   with VexRiscvCoreIODMem
-  with VexRiscvCoreIOIRvfi
+  // with VexRiscvCoreIOIRvfi
+  with VexRiscvCoreIOJtag
 
 class VexAXICore
   extends BlackBox
@@ -188,11 +196,13 @@ class VexAXICore
     require(file.delete(), s"Waring: cannot delete file $file")
   }
 
-  val config = SpinalConfig()
-  config.generateVerilog({
-    val toplevel = new VexCoreUse(VexAXIConfig.default)
-    toplevel
-  })
+  // val config = SpinalConfig()
+  // config.generateVerilog({
+  //   val toplevel = new VexCoreUse(VexAXIConfig.default)
+  //   toplevel
+  // })
+
+  VexAXIJTAGCore.run()
 
   addPath(targetVerilogFile)
 }
