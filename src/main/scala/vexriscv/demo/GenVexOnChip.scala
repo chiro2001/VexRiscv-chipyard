@@ -33,7 +33,8 @@ object VexOnChipConfig {
       earlyInjection = false,
       bigEndian = bigEndian
     ),
-    new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
+    // new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
+    new CsrPlugin(CsrPluginConfig.linuxFull(0x80000020L)),
     new DecoderSimplePlugin(
       catchIllegalInstruction = false
     ),
@@ -103,7 +104,7 @@ object VexOnChip {
           bigEndian = false
         ) else plugins += new IBusCachedPlugin(
           resetVector = resetVector,
-          prediction = STATIC,
+          prediction = DYNAMIC_TARGET,
           config = InstructionCacheConfig(
             cacheSize = iCacheSize,
             bytePerLine = 32,
@@ -218,6 +219,7 @@ object GenVexOnChip {
 
   def main(args: Array[String]): Unit = {
     val name = if (args.isEmpty) "VexCore" else args(0)
-    SpinalVerilog(VexOnChip(VexOnChipConfig.default).setDefinitionName(name))
+    SpinalVerilog(VexOnChip(VexOnChipConfig.default.copy(iCacheSize = 16 * 1024, onChipRamSize = 52 kB))
+      .setDefinitionName(name))
   }
 }
