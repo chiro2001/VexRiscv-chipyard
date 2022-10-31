@@ -355,7 +355,9 @@ abstract class VexCoreBase(onChopRAM: Boolean, moduleName: String = "VexCore")(i
   }
 
   if (onChopRAM) {
-    GenVexOnChip.run(p(VexRiscvConfigKey), name = moduleName)
+    val config = p(VexRiscvConfigKey)
+    println(s"VexCore OnChip generate with Config: ${config}")
+    GenVexOnChip.run(config, name = moduleName)
   } else {
     VexAXIJTAGCore.run()
   }

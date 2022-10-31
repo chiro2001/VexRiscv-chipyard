@@ -39,7 +39,7 @@ class WithVexDefaultConfig extends Config((site, here, up) => {
   case VexRiscvConfigKey => VexOnChipConfig.default
 })
 
-class WithVexICacheSize(iCacheSize: BigInt = 4 * 1024) extends Config((site, here, up) => {
+class WithVexICacheSize(iCacheSize: Int = 4 * 1024) extends Config((site, here, up) => {
   case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(iCacheSize = iCacheSize)
 })
 

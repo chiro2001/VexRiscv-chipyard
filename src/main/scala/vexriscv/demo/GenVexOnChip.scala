@@ -5,6 +5,7 @@ import spinal.lib.bus.amba4.axi.{Axi4CrossbarFactory, Axi4ReadOnly, Axi4Shared, 
 import spinal.lib.com.jtag.Jtag
 import spinal.lib.eda.altera.{InterruptReceiverTag, ResetEmitterTag}
 import spinal.lib.{master, slave}
+import vexriscv.ip.InstructionCacheConfig
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
 
@@ -12,7 +13,7 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 
 case class VexOnChipConfig
-(iCacheSize: BigInt = 4 kB,
+(iCacheSize: Int = 4 * 1024,
  onChipRamSize: BigInt = 32 kB,
  onChipRamHexFile: String = null,
  hardwareBreakpointCount: Int = 2,
@@ -26,15 +27,6 @@ import vexriscv.demo.VexInterfaceConfig._
 
 object VexOnChipConfig {
   def defaultPlugins(bigEndian: Boolean) = ArrayBuffer( //DebugPlugin added by the toplevel
-    new IBusSimplePlugin(
-      resetVector = resetVector,
-      cmdForkOnSecondStage = true,
-      cmdForkPersistence = true,
-      prediction = NONE,
-      catchAccessFault = false,
-      compressedGen = false,
-      bigEndian = bigEndian
-    ),
     new DBusSimplePlugin(
       catchAddressMisaligned = false,
       catchAccessFault = false,
@@ -96,10 +88,40 @@ object VexOnChip {
   def apply(config: VexOnChipConfig): VexRiscv = {
     import config._
 
+    val plugins = cpuPlugins += new DebugPlugin(ClockDomain.current.copy(reset = Bool().setName("debugReset")))
+
     // Instantiate the CPU
     val cpu = new VexRiscv(
       config = VexRiscvConfig(
-        plugins = cpuPlugins += new DebugPlugin(ClockDomain.current.copy(reset = Bool().setName("debugReset")))
+        plugins = if (iCacheSize == 0) plugins += new IBusSimplePlugin(
+          resetVector = resetVector,
+          cmdForkOnSecondStage = true,
+          cmdForkPersistence = true,
+          prediction = STATIC,
+          catchAccessFault = false,
+          compressedGen = false,
+          bigEndian = false
+        ) else plugins += new IBusCachedPlugin(
+          resetVector = resetVector,
+          prediction = STATIC,
+          config = InstructionCacheConfig(
+            cacheSize = iCacheSize,
+            bytePerLine = 32,
+            wayCount = 1,
+            addressWidth = 32,
+            cpuDataWidth = 32,
+            memDataWidth = 32,
+            catchIllegalAccess = false,
+            catchAccessFault = false,
+            asyncTagMemory = false,
+            twoCycleRam = true,
+            twoCycleCache = true
+          ),
+          // askMemoryTranslation = true,
+          // memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
+          //   portTlbSize = 4
+          // )
+        )
       )
     )
 
