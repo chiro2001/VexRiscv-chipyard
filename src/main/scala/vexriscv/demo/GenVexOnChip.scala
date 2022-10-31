@@ -12,67 +12,69 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 
 case class VexOnChipConfig
-(onChipRamSize: BigInt,
- onChipRamHexFile: String,
- hardwareBreakpointCount: Int,
- cpuPlugins: ArrayBuffer[Plugin[VexRiscv]]) {
+(iCacheSize: BigInt = 4 kB,
+ onChipRamSize: BigInt = 32 kB,
+ onChipRamHexFile: String = null,
+ hardwareBreakpointCount: Int = 2,
+ cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexOnChipConfig.defaultPlugins(bigEndian = false)) {
 }
+// object VexOnChipConfig {
+//   def apply(iCacheSize: BigInt, onChipRamSize: BigInt,)
+// }
 
 import vexriscv.demo.VexInterfaceConfig._
 
 object VexOnChipConfig {
-  def default: VexOnChipConfig = default(false)
+  def defaultPlugins(bigEndian: Boolean) = ArrayBuffer( //DebugPlugin added by the toplevel
+    new IBusSimplePlugin(
+      resetVector = resetVector,
+      cmdForkOnSecondStage = true,
+      cmdForkPersistence = true,
+      prediction = NONE,
+      catchAccessFault = false,
+      compressedGen = false,
+      bigEndian = bigEndian
+    ),
+    new DBusSimplePlugin(
+      catchAddressMisaligned = false,
+      catchAccessFault = false,
+      earlyInjection = false,
+      bigEndian = bigEndian
+    ),
+    new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
+    new DecoderSimplePlugin(
+      catchIllegalInstruction = false
+    ),
+    new RegFilePlugin(
+      regFileReadyKind = plugin.SYNC,
+      zeroBoot = false
+    ),
+    new IntAluPlugin,
+    new SrcPlugin(
+      separatedAddSub = false,
+      executeInsertion = false
+    ),
+    new LightShifterPlugin,
+    new HazardSimplePlugin(
+      bypassExecute = false,
+      bypassMemory = false,
+      bypassWriteBack = false,
+      bypassWriteBackBuffer = false,
+      pessimisticUseSrc = false,
+      pessimisticWriteRegFile = false,
+      pessimisticAddressMatch = false
+    ),
+    new BranchPlugin(
+      earlyBranch = false,
+      catchAddressMisaligned = false
+    ),
+    new YamlPlugin("cpu0.yaml")
+  )
+
+  def default: VexOnChipConfig = default()
 
   def default(bigEndian: Boolean = false) = VexOnChipConfig(
-    onChipRamSize = 32 kB,
-    onChipRamHexFile = null,
-    cpuPlugins = ArrayBuffer( //DebugPlugin added by the toplevel
-      new IBusSimplePlugin(
-        resetVector = resetVector,
-        cmdForkOnSecondStage = true,
-        cmdForkPersistence = true,
-        prediction = NONE,
-        catchAccessFault = false,
-        compressedGen = false,
-        bigEndian = bigEndian
-      ),
-      new DBusSimplePlugin(
-        catchAddressMisaligned = false,
-        catchAccessFault = false,
-        earlyInjection = false,
-        bigEndian = bigEndian
-      ),
-      new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
-      new DecoderSimplePlugin(
-        catchIllegalInstruction = false
-      ),
-      new RegFilePlugin(
-        regFileReadyKind = plugin.SYNC,
-        zeroBoot = false
-      ),
-      new IntAluPlugin,
-      new SrcPlugin(
-        separatedAddSub = false,
-        executeInsertion = false
-      ),
-      new LightShifterPlugin,
-      new HazardSimplePlugin(
-        bypassExecute = false,
-        bypassMemory = false,
-        bypassWriteBack = false,
-        bypassWriteBackBuffer = false,
-        pessimisticUseSrc = false,
-        pessimisticWriteRegFile = false,
-        pessimisticAddressMatch = false
-      ),
-      new BranchPlugin(
-        earlyBranch = false,
-        catchAddressMisaligned = false
-      ),
-      new YamlPlugin("cpu0.yaml")
-    ),
-    hardwareBreakpointCount = 2
-  )
+    cpuPlugins = defaultPlugins(bigEndian))
 
   def fast = {
     val config = default
@@ -151,7 +153,7 @@ object VexOnChip {
         dataWidth = 32,
         byteCount = onChipRamSize,
         idWidth = 4
-      ).setName("onchip_name")
+      ).setName("onchip_mem")
 
 
       val axiCrossbar = Axi4CrossbarFactory()
@@ -188,6 +190,10 @@ object VexOnChip {
 }
 
 object GenVexOnChip {
+  def run(config: VexOnChipConfig, name: String = "VexCore"): Unit = {
+    SpinalVerilog(VexOnChip(config).setDefinitionName(name))
+  }
+
   def main(args: Array[String]): Unit = {
     val name = if (args.isEmpty) "VexCore" else args(0)
     SpinalVerilog(VexOnChip(VexOnChipConfig.default).setDefinitionName(name))

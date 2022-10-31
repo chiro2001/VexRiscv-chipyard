@@ -11,11 +11,12 @@
 
 package vexriscv.chipyard
 
+import chipsalliance.rocketchip.config.Parameters
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.amba.axi4.AXI4Bundle
 import spinal.core.SpinalConfig
-import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAXIJTAGCore, VexInterfaceConfig, VexOnChip}
+import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAXIJTAGCore, VexInterfaceConfig, VexOnChip, VexOnChipConfig}
 // import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 
@@ -339,7 +340,7 @@ class VexRiscvCoreIOPartAXI extends Bundle
   with VexRiscvCoreIODMemPartConfig
   with VexRiscvCoreIOBasic
 
-abstract class VexCoreBase(onChopRAM: Boolean, moduleName: String = "VexCore")
+abstract class VexCoreBase(onChopRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
   extends BlackBox
     with HasBlackBoxPath {
   val io: VexRiscvCoreIOBasic with VexRiscvCoreIODMemConnector
@@ -354,7 +355,7 @@ abstract class VexCoreBase(onChopRAM: Boolean, moduleName: String = "VexCore")
   }
 
   if (onChopRAM) {
-    GenVexOnChip.main(Array(moduleName))
+    GenVexOnChip.run(p(VexRiscvConfigKey), name = moduleName)
   } else {
     VexAXIJTAGCore.run()
   }
@@ -362,12 +363,12 @@ abstract class VexCoreBase(onChopRAM: Boolean, moduleName: String = "VexCore")
   addPath(targetVerilogFile)
 }
 
-class VexAXICorePart(onChopRAM: Boolean) extends VexCoreBase(onChopRAM) {
+class VexAXICorePart(onChopRAM: Boolean)(implicit p: Parameters) extends VexCoreBase(onChopRAM) {
   override val io = IO(new VexRiscvCoreIOPartAXI)
 }
 
-class VexAXICoreFull(onChopRAM: Boolean) extends VexCoreBase(onChopRAM) {
+class VexAXICoreFull(onChopRAM: Boolean)(implicit p: Parameters) extends VexCoreBase(onChopRAM) {
   override val io = IO(new VexRiscvCoreIOFullAXI)
 }
 
-class VexCore(onChopRAM: Boolean) extends VexAXICoreFull(onChopRAM)
+class VexCore(onChopRAM: Boolean)(implicit p: Parameters) extends VexAXICoreFull(onChopRAM)

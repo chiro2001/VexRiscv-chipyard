@@ -5,9 +5,11 @@
 
 package vexriscv.chipyard
 
+import chipsalliance.rocketchip.config.Field
 import freechips.rocketchip.config.Config
 import freechips.rocketchip.subsystem._
 import freechips.rocketchip.tile._
+import vexriscv.demo.VexOnChipConfig
 
 /**
  * Create multiple copies of a VexRiscv tile (and thus a core).
@@ -31,3 +33,16 @@ class WithNVexRiscvCores(n: Int = 1, overrideIdOffset: Option[Int] = None, onChi
   case XLen => 32
 })
 
+case object VexRiscvConfigKey extends Field[VexOnChipConfig]
+
+class WithVexDefaultConfig extends Config((site, here, up) => {
+  case VexRiscvConfigKey => VexOnChipConfig.default
+})
+
+class WithVexICacheSize(iCacheSize: BigInt = 4 * 1024) extends Config((site, here, up) => {
+  case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(iCacheSize = iCacheSize)
+})
+
+class WithVexOnChipMemSize(onChipMemSize: BigInt = 32 * 1024) extends Config((site, here, up) => {
+  case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(onChipRamSize = onChipMemSize)
+})
