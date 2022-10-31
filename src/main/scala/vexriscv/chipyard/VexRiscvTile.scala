@@ -23,6 +23,7 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.tile._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
+import vexriscv.chipyard.{VexCore => VexCoreUse}
 
 case class VexRiscvCoreParams
 (bootFreqHz: BigInt = BigInt(1700000000))
@@ -258,7 +259,7 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   val traceInstSz = (new freechips.rocketchip.rocket.TracedInstruction).getWidth + 2
 
   // connect the vexRiscv core
-  val core: VexCore = Module(new VexAXICoreFull(outer.vexRiscvParams.onChipRAM))
+  val core: VexCoreBase = Module(new VexCoreUse(outer.vexRiscvParams.onChipRAM))
     .suggestName("vexRiscv_core_inst")
 
   core.io.clk := clock
@@ -266,14 +267,7 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
 
   // TODO: connect JTAG
   core.io.debugReset := reset.asBool
-  val j = core.io
-
-  import chisel3.util.experimental.BoringUtils._
-
-  addSink(j.jtag_tck, "jtag_TCK")
-  addSink(j.jtag_tms, "jtag_TMS")
-  addSink(j.jtag_tdi, "jtag_TDI")
-  addSource(j.jtag_tdo, "jtag_TDO")
+  // val jtagBundle = BundleBridgeSink[VexJTAGChipIO](Some(() => new VexJTAGChipIO))
 
   outer.connectVexRiscvInterrupts(core.io.softwareInterrupt, core.io.timerInterrupt, core.io.externalInterrupt)
 

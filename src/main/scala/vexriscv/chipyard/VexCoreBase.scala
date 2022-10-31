@@ -339,7 +339,7 @@ class VexRiscvCoreIOPartAXI extends Bundle
   with VexRiscvCoreIODMemPartConfig
   with VexRiscvCoreIOBasic
 
-abstract class VexCore(onChopRAM: Boolean, moduleName: String = "VexCore")
+abstract class VexCoreBase(onChopRAM: Boolean, moduleName: String = "VexCore")
   extends BlackBox
     with HasBlackBoxPath {
   val io: VexRiscvCoreIOBasic with VexRiscvCoreIODMemConnector
@@ -362,11 +362,12 @@ abstract class VexCore(onChopRAM: Boolean, moduleName: String = "VexCore")
   addPath(targetVerilogFile)
 }
 
-class VexAXICorePart(onChopRAM: Boolean) extends VexCore(onChopRAM) {
+class VexAXICorePart(onChopRAM: Boolean) extends VexCoreBase(onChopRAM) {
   override val io = IO(new VexRiscvCoreIOPartAXI)
 }
 
-class VexAXICoreFull(onChopRAM: Boolean) extends VexCore(onChopRAM) {
+class VexAXICoreFull(onChopRAM: Boolean) extends VexCoreBase(onChopRAM) {
   override val io = IO(new VexRiscvCoreIOFullAXI)
 }
 
+class VexCore(onChopRAM: Boolean) extends VexAXICoreFull(onChopRAM)
