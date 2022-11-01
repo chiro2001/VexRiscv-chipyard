@@ -1,24 +1,20 @@
 package vexriscv.demo
 
 import spinal.core._
-import spinal.lib.bus.amba3.apb.{Apb3, Apb3Config, Apb3Decoder, Apb3Gpio}
-import spinal.lib.bus.amba4.axi.{Axi4CrossbarFactory, Axi4ReadOnly, Axi4Shared, Axi4SharedOnChipRam}
+import spinal.lib.bus.amba3.apb.{Apb3, Apb3Config, Apb3Decoder}
 import spinal.lib.bus.misc.SizeMapping
 import spinal.lib.bus.simple.{PipelinedMemoryBus, PipelinedMemoryBusConfig, PipelinedMemoryBusToApbBridge}
 import spinal.lib.com.jtag.Jtag
-import spinal.lib.com.spi.ddr.{Apb3SpiXdrMasterCtrl, SpiXdrMaster}
-import spinal.lib.com.uart.{Apb3UartCtrl, Uart, UartCtrlGenerics, UartCtrlInitConfig, UartCtrlMemoryMappedConfig, UartParityType, UartStopType}
-import spinal.lib.eda.altera.{InterruptReceiverTag, ResetEmitterTag}
-import spinal.lib.io.TriStateArray
+import spinal.lib.com.uart._
 import spinal.lib.{BufferCC, master, slave}
-import vexriscv.ip.InstructionCacheConfig
+import vexriscv.demo.GenVexChip.{makeCoreMark, run}
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
 
 import java.io.File
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
-import sys.process._
+import scala.sys.process._
 
 case class VexChipConfig
 (iCacheSize: Int = 0,
@@ -29,11 +25,9 @@ case class VexChipConfig
  coreFrequency: HertzNumber = 5 MHz,
  pipelineDBus: Boolean = true,
  pipelineApbBridge: Boolean = true,
+ debug: Boolean = true,
  cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexChipConfig.defaultPlugins(bigEndian = false)) {
 }
-// object VexChipConfig {
-//   def apply(iCacheSize: BigInt, onChipRamSize: BigInt,)
-// }
 
 import vexriscv.demo.VexInterfaceConfig._
 
@@ -41,25 +35,30 @@ object VexChipConfig {
   def defaultPlugins(bigEndian: Boolean) = ArrayBuffer( //DebugPlugin added by the toplevel
     new IBusSimplePlugin(
       resetVector = resetVector,
-      cmdForkOnSecondStage = true,
-      cmdForkPersistence = true,
-      prediction = NONE,
-      catchAccessFault = false,
+      cmdForkOnSecondStage = false,
+      cmdForkPersistence = false,
+      prediction = DYNAMIC_TARGET,
+      historyRamSizeLog2 = 8,
+      catchAccessFault = true,
       compressedGen = false,
       bigEndian = false
     ),
     new DBusSimplePlugin(
-      catchAddressMisaligned = false,
-      catchAccessFault = false,
+      catchAddressMisaligned = true,
+      catchAccessFault = true,
       earlyInjection = false,
       bigEndian = bigEndian
     ),
+    new StaticMemoryTranslatorPlugin(
+      ioRange = _ (31 downto 28) === 0xF
+    ),
     // // new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
     // new CsrPlugin(CsrPluginConfig.linuxFull(0x80000020L)),
-    new CsrPlugin(CsrPluginConfig.all(0x80000020L)),
+    new CsrPlugin(CsrPluginConfig.small),
+    // new CsrPlugin(CsrPluginConfig.all(0x80000020L)),
     // new CsrPlugin(CsrPluginConfig.openSbi(0, 66)),
     new DecoderSimplePlugin(
-      catchIllegalInstruction = false
+      catchIllegalInstruction = true
     ),
     new RegFilePlugin(
       regFileReadyKind = plugin.SYNC,
@@ -68,18 +67,21 @@ object VexChipConfig {
     new IntAluPlugin,
     new SrcPlugin(
       separatedAddSub = false,
-      executeInsertion = false
+      executeInsertion = true
     ),
-    new LightShifterPlugin,
+    // new LightShifterPlugin,
+    new FullBarrelShifterPlugin(earlyInjection = true),
     new HazardSimplePlugin(
-      bypassExecute = false,
-      bypassMemory = false,
-      bypassWriteBack = false,
-      bypassWriteBackBuffer = false,
+      bypassExecute = true,
+      bypassMemory = true,
+      bypassWriteBack = true,
+      bypassWriteBackBuffer = true,
       pessimisticUseSrc = false,
       pessimisticWriteRegFile = false,
       pessimisticAddressMatch = false
     ),
+    new MulPlugin,
+    new MulDivIterativePlugin(genMul = false, genDiv = true, mulUnrollFactor = 1, divUnrollFactor = 1, dhrystoneOpt = false),
     new BranchPlugin(
       earlyBranch = false,
       catchAddressMisaligned = false
@@ -109,6 +111,7 @@ object VexChipConfig {
 }
 
 class VexChip(config: VexChipConfig) extends Component {
+
   import config._
 
   val io = new Bundle {
@@ -117,7 +120,7 @@ class VexChip(config: VexChipConfig) extends Component {
     val sys_clock = in Bool()
 
     //Main components IO
-    val jtag = slave(Jtag())
+    var jtag: Jtag = null
 
     //Peripherals IO
     val uart = master(Uart())
@@ -179,7 +182,8 @@ class VexChip(config: VexChipConfig) extends Component {
     //Instanciate the CPU
     val cpu = new VexRiscv(
       config = VexRiscvConfig(
-        plugins = cpuPlugins += new DebugPlugin(debugClockDomain, hardwareBreakpointCount)
+        // plugins = if (debug) cpuPlugins += new DebugPlugin(debugClockDomain, hardwareBreakpointCount) else cpuPlugins
+        plugins = cpuPlugins
       )
     )
 
@@ -204,6 +208,7 @@ class VexChip(config: VexChipConfig) extends Component {
       }
       case plugin: DebugPlugin => plugin.debugClockDomain {
         resetCtrl.systemReset setWhen (RegNext(plugin.io.resetOut))
+        io.jtag = slave(Jtag())
         io.jtag <> plugin.io.bus.fromJtag()
       }
       case _ =>
@@ -286,13 +291,17 @@ object VexChip {
 }
 
 object GenVexChip {
-  def makeCoreMark(): String = {
+  def makeCoreMark(force: Boolean = false): String = {
     val baseDir = "./software/coremark"
     val binary = new File(s"$baseDir/overlay/coremark.bootrom.bin")
-    val clean = s"make -C $baseDir clean"
-    require(clean.! == 0 && !binary.exists(), "Failed to clean coremark!")
-    val make = s"make -C $baseDir"
-    require(make.! == 0 && binary.exists(), "Failed to build coremark!")
+    if (force) {
+      val clean = s"make -C $baseDir clean"
+      require(clean.! == 0 && !binary.exists(), "Failed to clean coremark!")
+    }
+    if (force || !binary.exists()) {
+      val make = s"make -C $baseDir"
+      require(make.! == 0 && binary.exists(), "Failed to build coremark!")
+    }
     binary.getAbsolutePath
   }
 
@@ -303,6 +312,10 @@ object GenVexChip {
   def main(args: Array[String]): Unit = {
     val filename = if (args.length > 1) args(1) else makeCoreMark()
     val name = if (args.isEmpty) "VexChip" else args(0)
-    run(VexChipConfig.default.copy(onChipRamBinaryFile = filename), name = name)
+    run(VexChipConfig.default.copy(onChipRamBinaryFile = filename, debug = false), name = name)
   }
+}
+
+object GenVexChipDebug extends App {
+  run(VexChipConfig.default.copy(onChipRamBinaryFile = makeCoreMark(), debug = true), name = "VexChipDebug")
 }
