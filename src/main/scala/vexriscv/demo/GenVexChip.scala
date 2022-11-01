@@ -312,7 +312,9 @@ object GenVexChip {
   def main(args: Array[String]): Unit = {
     val filename = if (args.length > 1) args(1) else makeCoreMark()
     val name = if (args.isEmpty) "VexChip" else args(0)
-    run(VexChipConfig.default.copy(onChipRamBinaryFile = filename, debug = false), name = name)
+    run(VexChipConfig.default.copy(
+      onChipRamBinaryFile = filename, debug = false,
+      coreFrequency = 100 MHz), name = name)
   }
 }
 
