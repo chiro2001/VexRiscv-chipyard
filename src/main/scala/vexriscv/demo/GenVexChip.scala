@@ -76,7 +76,7 @@ object VexChipConfig {
       earlyBranch = false,
       catchAddressMisaligned = false
     ),
-    // new YamlPlugin("cpu0.yaml")
+    new YamlPlugin("VexChip.yaml")
   )
 
   def default: VexChipConfig = default()
@@ -328,6 +328,7 @@ object GenVexChip {
 object GenVexChipDebug extends App {
   run(VexChipConfig.default.copy(
     onChipRamBinaryFile = makeCoreMark(), debug = true,
+    coreFrequency = 100 MHz,
     resetVector = 0x80000000L,
     negativeReset = false
   ), name = "VexChip")

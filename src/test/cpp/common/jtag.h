@@ -76,7 +76,7 @@ class Jtag : public TimeProcess {
     //---- Configure settings of the server address struct ----//
     // Address family = Internet //
     serverAddr.sin_family = AF_INET;
-    serverAddr.sin_port = htons(9823);
+    serverAddr.sin_port = htons(7893);
     serverAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
     memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);
 
