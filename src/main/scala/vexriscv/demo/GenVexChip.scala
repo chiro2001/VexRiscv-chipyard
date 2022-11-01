@@ -26,23 +26,13 @@ case class VexChipConfig
  pipelineDBus: Boolean = true,
  pipelineApbBridge: Boolean = true,
  debug: Boolean = true,
+ resetVector: BigInt = vexriscv.demo.VexInterfaceConfig.resetVector,
+ negativeReset: Boolean = false,
  cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexChipConfig.defaultPlugins(bigEndian = false)) {
 }
 
-import vexriscv.demo.VexInterfaceConfig._
-
 object VexChipConfig {
   def defaultPlugins(bigEndian: Boolean) = ArrayBuffer( //DebugPlugin added by the toplevel
-    new IBusSimplePlugin(
-      resetVector = resetVector,
-      cmdForkOnSecondStage = false,
-      cmdForkPersistence = false,
-      prediction = DYNAMIC_TARGET,
-      historyRamSizeLog2 = 8,
-      catchAccessFault = true,
-      compressedGen = false,
-      bigEndian = false
-    ),
     new DBusSimplePlugin(
       catchAddressMisaligned = true,
       catchAccessFault = true,
@@ -120,13 +110,14 @@ class VexChip(config: VexChipConfig) extends Component {
     val sys_clock = in Bool()
 
     //Main components IO
-    var jtag: Jtag = null
+    var jtag: Jtag = _
 
     //Peripherals IO
     val uart = master(Uart())
   }.setName("")
 
-  val resetP = ~io.reset
+  // val resetP = if (negativeReset) ~io.reset else io.reset
+  val resetP = io.reset
 
   val resetCtrlClockDomain = ClockDomain(
     clock = io.sys_clock,
@@ -173,6 +164,19 @@ class VexChip(config: VexChipConfig) extends Component {
       dataWidth = 32
     )
 
+    cpuPlugins += new IBusSimplePlugin(
+      resetVector = resetVector,
+      cmdForkOnSecondStage = false,
+      cmdForkPersistence = false,
+      prediction = DYNAMIC_TARGET,
+      historyRamSizeLog2 = 8,
+      catchAccessFault = true,
+      compressedGen = false,
+      bigEndian = false
+    )
+    require(cpuPlugins.exists(p => p.isInstanceOf[IBusSimplePlugin]))
+    println(s"resetVector = ${resetVector}")
+
     val bigEndianDBus = config.cpuPlugins.exists { case plugin: DBusSimplePlugin => plugin.bigEndian case _ => false }
 
     //Arbiter of the cpu dBus/iBus to drive the mainBus
@@ -182,8 +186,7 @@ class VexChip(config: VexChipConfig) extends Component {
     //Instanciate the CPU
     val cpu = new VexRiscv(
       config = VexRiscvConfig(
-        // plugins = if (debug) cpuPlugins += new DebugPlugin(debugClockDomain, hardwareBreakpointCount) else cpuPlugins
-        plugins = cpuPlugins
+        plugins = if (debug) cpuPlugins += new DebugPlugin(debugClockDomain, hardwareBreakpointCount) else cpuPlugins
       )
     )
 
@@ -208,7 +211,7 @@ class VexChip(config: VexChipConfig) extends Component {
       }
       case plugin: DebugPlugin => plugin.debugClockDomain {
         resetCtrl.systemReset setWhen (RegNext(plugin.io.resetOut))
-        io.jtag = slave(Jtag())
+        io.jtag = slave(Jtag()).setName("jtag")
         io.jtag <> plugin.io.bus.fromJtag()
       }
       case _ =>
@@ -223,7 +226,8 @@ class VexChip(config: VexChipConfig) extends Component {
       pipelinedMemoryBusConfig = pipelinedMemoryBusConfig,
       bigEndian = bigEndianDBus
     )
-    mainBusMapping += ram.io.bus -> (0x80000000L, onChipRamSize)
+    // mainBusMapping += ram.io.bus -> (0x80000000L, onChipRamSize)
+    mainBusMapping += ram.io.bus -> (resetVector, onChipRamSize)
 
     val apbBridge = new PipelinedMemoryBusToApbBridge(
       apb3Config = Apb3Config(
@@ -233,7 +237,7 @@ class VexChip(config: VexChipConfig) extends Component {
       pipelineBridge = pipelineApbBridge,
       pipelinedMemoryBusConfig = pipelinedMemoryBusConfig
     )
-    mainBusMapping += apbBridge.io.pipelinedMemoryBus -> (0x00000000L, 1 MB)
+    mainBusMapping += apbBridge.io.pipelinedMemoryBus -> (0x54000000L, 1 MB)
 
 
     //******** APB peripherals *********
@@ -262,7 +266,7 @@ class VexChip(config: VexChipConfig) extends Component {
     val uartCtrl = Apb3UartCtrl(uartCtrlConfig)
     uartCtrl.io.uart <> io.uart
     externalInterrupt setWhen (uartCtrl.io.interrupt)
-    apbMapping += uartCtrl.io.apb -> (0x10000, 4 kB)
+    apbMapping += uartCtrl.io.apb -> (0x00000, 4 kB)
 
     val timer = new MuraxApb3Timer()
     timerInterrupt setWhen (timer.io.interrupt)
@@ -314,10 +318,17 @@ object GenVexChip {
     val name = if (args.isEmpty) "VexChip" else args(0)
     run(VexChipConfig.default.copy(
       onChipRamBinaryFile = filename, debug = false,
-      coreFrequency = 100 MHz), name = name)
+      coreFrequency = 100 MHz,
+      resetVector = 0x80000000L,
+      negativeReset = false
+    ), name = name)
   }
 }
 
 object GenVexChipDebug extends App {
-  run(VexChipConfig.default.copy(onChipRamBinaryFile = makeCoreMark(), debug = true), name = "VexChipDebug")
+  run(VexChipConfig.default.copy(
+    onChipRamBinaryFile = makeCoreMark(), debug = true,
+    resetVector = 0x80000000L,
+    negativeReset = false
+  ), name = "VexChip")
 }
