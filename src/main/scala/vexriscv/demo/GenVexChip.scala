@@ -15,13 +15,15 @@ import vexriscv.ip.InstructionCacheConfig
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
 
+import java.io.File
 import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
+import sys.process._
 
 case class VexChipConfig
 (iCacheSize: Int = 0,
  onChipRamSize: BigInt = 64 kB,
- onChipRamHexFile: String = null,
+ onChipRamBinaryFile: String = null,
  hardwareBreakpointCount: Int = 2,
  pipelineMainBus: Boolean = false,
  coreFrequency: HertzNumber = 5 MHz,
@@ -210,9 +212,9 @@ class VexChip(config: VexChipConfig) extends Component {
 
     //****** MainBus slaves ********
     val mainBusMapping = ArrayBuffer[(PipelinedMemoryBus, SizeMapping)]()
-    val ram = new MuraxPipelinedMemoryBusRam(
+    val ram = new VexChipPipelinedMemoryBusRam(
       onChipRamSize = onChipRamSize,
-      onChipRamHexFile = onChipRamHexFile,
+      onChipRamBinaryFile = onChipRamBinaryFile,
       pipelinedMemoryBusConfig = pipelinedMemoryBusConfig,
       bigEndian = bigEndianDBus
     )
@@ -284,12 +286,23 @@ object VexChip {
 }
 
 object GenVexChip {
+  def makeCoreMark(): String = {
+    val baseDir = "./software/coremark"
+    val binary = new File(s"$baseDir/overlay/coremark.bootrom.bin")
+    val clean = s"make -C $baseDir clean"
+    require(clean.! == 0 && !binary.exists(), "Failed to clean coremark!")
+    val make = s"make -C $baseDir"
+    require(make.! == 0 && binary.exists(), "Failed to build coremark!")
+    binary.getAbsolutePath
+  }
+
   def run(config: VexChipConfig, name: String = "VexChip"): Unit = {
     SpinalVerilog(VexChip(config).setDefinitionName(name))
   }
 
   def main(args: Array[String]): Unit = {
+    val filename = if (args.length > 1) args(1) else makeCoreMark()
     val name = if (args.isEmpty) "VexChip" else args(0)
-    run(VexChipConfig.default, name = name)
+    run(VexChipConfig.default.copy(onChipRamBinaryFile = filename), name = name)
   }
 }
