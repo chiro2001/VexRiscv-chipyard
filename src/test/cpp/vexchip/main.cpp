@@ -5,6 +5,10 @@
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 
+#ifndef TRACE
+#error "TRACE!"
+#endif
+
 class VexChipWorkspace : public Workspace<VVexChip> {
  public:
   VexChipWorkspace() : Workspace("VexChip") {
@@ -20,8 +24,8 @@ class VexChipWorkspace : public Workspace<VVexChip> {
     timeProcesses.push_back(uartTx);
 
 #ifdef TRACE
-// speedFactor = 10e-3;
-// cout << "Simulation caped to " << speedFactor << " of real time"<< endl;
+    // speedFactor = 10e-3;
+    // cout << "Simulation caped to " << speedFactor << " of real time"<< endl;
 #endif
   }
 };
