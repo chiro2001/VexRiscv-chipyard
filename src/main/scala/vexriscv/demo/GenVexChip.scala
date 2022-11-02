@@ -35,8 +35,10 @@ case class VexChipConfig
 object VexChipConfig {
   def defaultPlugins(bigEndian: Boolean) = ArrayBuffer( //DebugPlugin added by the toplevel
     new DBusSimplePlugin(
-      catchAddressMisaligned = true,
-      catchAccessFault = true,
+      // catchAddressMisaligned = true,
+      catchAddressMisaligned = false,
+      // catchAccessFault = true,
+      catchAccessFault = false,
       earlyInjection = false,
       bigEndian = bigEndian
     ),
@@ -307,11 +309,12 @@ object GenVexChip {
     val baseDir = "./software/coremark"
     val binary = new File(s"$baseDir/overlay/coremark.bootrom.bin")
     if (force) {
-      val clean = s"make -C $baseDir clean"
+      // val clean = s"make -C $baseDir clean"
+      val clean = s"make -C $baseDir/riscv-coremark clean"
       require(clean.! == 0 && !binary.exists(), "Failed to clean coremark!")
     }
     if (force || !binary.exists()) {
-      val make = s"make -C $baseDir"
+      val make = s"make -C $baseDir/riscv-coremark bootrom"
       require(make.! == 0 && binary.exists(), "Failed to build coremark!")
     }
     binary.getAbsolutePath
@@ -340,6 +343,7 @@ object GenVexChip {
     val name = if (args.isEmpty) "VexChip" else args(0)
     run(VexChipConfig.default.copy(
       onChipRamBinaryFile = filename, debug = false,
+      // onChipRamSize = 280 KiB,
       coreFrequency = 100 MHz,
       resetVector = 0x80000000L,
       negativeReset = false
@@ -351,7 +355,8 @@ object GenVexChipDebug extends App {
   run(VexChipConfig.default.copy(
     onChipRamBinaryFile = makeCoreMark(), debug = true,
     // onChipRamBinaryFile = makeTests(), debug = true,
-    onChipRamSize = 1 MB,
+    // onChipRamSize = 280 KiB,
+    onChipRamSize = 65535,
     coreFrequency = 100 MHz,
     uartBaudRate = 921600,
     resetVector = 0x80000000L,
