@@ -5,16 +5,14 @@
 #include "verilated.h"
 #include "verilated_vcd_c.h"
 
-#ifndef TRACE
-#error "TRACE!"
-#endif
-
 class VexChipWorkspace : public Workspace<VVexChip> {
  public:
   VexChipWorkspace() : Workspace("VexChip") {
+    uint64_t clockPeriod = (uint64_t)(1.0e12 / (100 * 1e6));
     ClockDomain *mainClk =
-        new ClockDomain(&top->sys_clock, NULL, 83333, 300000);
+        new ClockDomain(&top->sys_clock, NULL, clockPeriod, 300000);
     AsyncReset *asyncReset = new AsyncReset(&top->reset, 50000);
+    // 100 MHz
     UartRx *uartRx = new UartRx(&top->uart_txd, 1.0e12 / 115200);
     UartTx *uartTx = new UartTx(&top->uart_rxd, 1.0e12 / 115200);
 

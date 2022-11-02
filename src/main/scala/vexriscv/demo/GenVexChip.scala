@@ -7,7 +7,7 @@ import spinal.lib.bus.simple.{PipelinedMemoryBus, PipelinedMemoryBusConfig, Pipe
 import spinal.lib.com.jtag.Jtag
 import spinal.lib.com.uart._
 import spinal.lib.{BufferCC, master, slave}
-import vexriscv.demo.GenVexChip.{makeCoreMark, run}
+import vexriscv.demo.GenVexChip.{makeCoreMark, makeTests, run}
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
 
@@ -28,6 +28,7 @@ case class VexChipConfig
  debug: Boolean = true,
  resetVector: BigInt = vexriscv.demo.VexInterfaceConfig.resetVector,
  negativeReset: Boolean = false,
+ uartBaudRate: Int = 115200,
  cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexChipConfig.defaultPlugins(bigEndian = false)) {
 }
 
@@ -44,8 +45,10 @@ object VexChipConfig {
     ),
     // // new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
     // new CsrPlugin(CsrPluginConfig.linuxFull(0x80000020L)),
-    new CsrPlugin(CsrPluginConfig.small),
+    // new CsrPlugin(CsrPluginConfig.small(0x000000E0L)),
+    // new CsrPlugin(CsrPluginConfig.linuxFull(0x800000E0L)),
     // new CsrPlugin(CsrPluginConfig.all(0x80000020L)),
+    new CsrPlugin(CsrPluginConfig.all(0x800000E0L)),
     // new CsrPlugin(CsrPluginConfig.openSbi(0, 66)),
     new DecoderSimplePlugin(
       catchIllegalInstruction = true
@@ -174,6 +177,7 @@ class VexChip(config: VexChipConfig) extends Component {
       compressedGen = false,
       bigEndian = false
     )
+    cpuPlugins += new SimpleFormalPlugin
     require(cpuPlugins.exists(p => p.isInstanceOf[IBusSimplePlugin]))
     println(s"resetVector = ${resetVector}")
 
@@ -214,6 +218,10 @@ class VexChip(config: VexChipConfig) extends Component {
         io.jtag = slave(Jtag()).setName("jtag")
         io.jtag <> plugin.io.bus.fromJtag()
       }
+      case plugin: SimpleFormalPlugin => {
+        println("Enabled SimpleFormalPlugin")
+        plugin.rvfi <> master(SimpleRvfiPort()).setName("rvfi")
+      }
       case _ =>
     }
 
@@ -252,14 +260,14 @@ class VexChip(config: VexChipConfig) extends Component {
         postSamplingSize = 1
       ),
       initConfig = UartCtrlInitConfig(
-        baudrate = 115200,
+        baudrate = uartBaudRate,
         dataLength = 7, //7 => 8 bits
         parity = UartParityType.NONE,
         stop = UartStopType.ONE
       ),
       busCanWriteClockDividerConfig = false,
       busCanWriteFrameConfig = false,
-      txFifoDepth = 16,
+      txFifoDepth = 1024,
       rxFifoDepth = 16
     )
 
@@ -295,7 +303,7 @@ object VexChip {
 }
 
 object GenVexChip {
-  def makeCoreMark(force: Boolean = false): String = {
+  def makeCoreMark(force: Boolean = true): String = {
     val baseDir = "./software/coremark"
     val binary = new File(s"$baseDir/overlay/coremark.bootrom.bin")
     if (force) {
@@ -305,6 +313,20 @@ object GenVexChip {
     if (force || !binary.exists()) {
       val make = s"make -C $baseDir"
       require(make.! == 0 && binary.exists(), "Failed to build coremark!")
+    }
+    binary.getAbsolutePath
+  }
+
+  def makeTests(force: Boolean = true): String = {
+    val baseDir = "./software/tests"
+    val binary = new File(s"$baseDir/start.rv32.img")
+    if (force) {
+      val clean = s"make -C $baseDir clean"
+      require(clean.! == 0 && !binary.exists(), "Failed to clean bootrom!")
+    }
+    if (force || !binary.exists()) {
+      val make = s"make -C $baseDir"
+      require(make.! == 0 && binary.exists(), "Failed to build bootrom!")
     }
     binary.getAbsolutePath
   }
@@ -328,8 +350,11 @@ object GenVexChip {
 object GenVexChipDebug extends App {
   run(VexChipConfig.default.copy(
     onChipRamBinaryFile = makeCoreMark(), debug = true,
+    // onChipRamBinaryFile = makeTests(), debug = true,
+    onChipRamSize = 1 MB,
     coreFrequency = 100 MHz,
+    uartBaudRate = 921600,
     resetVector = 0x80000000L,
-    negativeReset = false
+    negativeReset = false,
   ), name = "VexChip")
 }
