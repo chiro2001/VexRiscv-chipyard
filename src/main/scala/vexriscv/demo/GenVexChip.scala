@@ -20,7 +20,7 @@ case class VexChipConfig
 (iCacheSize: Int = 0,
  onChipRamSize: BigInt = 64 kB,
  onChipRamBinaryFile: String = null,
- hardwareBreakpointCount: Int = 2,
+ hardwareBreakpointCount: Int = 3,
  pipelineMainBus: Boolean = false,
  coreFrequency: HertzNumber = 5 MHz,
  pipelineDBus: Boolean = true,
