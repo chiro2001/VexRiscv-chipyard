@@ -29,6 +29,7 @@ case class VexChipConfig
  resetVector: BigInt = vexriscv.demo.VexInterfaceConfig.resetVector,
  negativeReset: Boolean = false,
  uartBaudRate: Int = 115200,
+ replaceMemoryIP: Boolean = false,
  cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexChipConfig.defaultPlugins(bigEndian = false)) {
 }
 
@@ -75,8 +76,10 @@ object VexChipConfig {
       pessimisticWriteRegFile = false,
       pessimisticAddressMatch = false
     ),
+    // new MulPlugin,
+    // new MulDivIterativePlugin(genMul = false, genDiv = true, mulUnrollFactor = 1, divUnrollFactor = 1, dhrystoneOpt = false),
     new MulPlugin,
-    new MulDivIterativePlugin(genMul = false, genDiv = true, mulUnrollFactor = 1, divUnrollFactor = 1, dhrystoneOpt = false),
+    new DivPlugin,
     new BranchPlugin(
       earlyBranch = false,
       catchAddressMisaligned = false
@@ -122,7 +125,8 @@ class VexChip(config: VexChipConfig) extends Component {
   }.setName("")
 
   // val resetP = if (negativeReset) ~io.reset else io.reset
-  val resetP = io.reset
+  val resetInput = io.reset
+  val resetInputNeg = ~io.reset
 
   val resetCtrlClockDomain = ClockDomain(
     clock = io.sys_clock,
@@ -141,7 +145,7 @@ class VexChip(config: VexChipConfig) extends Component {
       systemClkResetCounter := systemClkResetCounter + 1
       mainClkResetUnbuffered := True
     }
-    when(BufferCC(resetP)) {
+    when(BufferCC(if (negativeReset) resetInput else resetInputNeg)) {
       systemClkResetCounter := 0
     }
 
@@ -169,17 +173,19 @@ class VexChip(config: VexChipConfig) extends Component {
       dataWidth = 32
     )
 
-    cpuPlugins += new IBusSimplePlugin(
-      resetVector = resetVector,
-      cmdForkOnSecondStage = false,
-      cmdForkPersistence = false,
-      prediction = DYNAMIC_TARGET,
-      historyRamSizeLog2 = 8,
-      catchAccessFault = true,
-      compressedGen = false,
-      bigEndian = false
-    )
-    cpuPlugins += new SimpleFormalPlugin
+    if (!cpuPlugins.exists(p => p.isInstanceOf[IBusSimplePlugin]))
+      cpuPlugins += new IBusSimplePlugin(
+        resetVector = resetVector,
+        cmdForkOnSecondStage = false,
+        cmdForkPersistence = false,
+        prediction = DYNAMIC_TARGET,
+        historyRamSizeLog2 = 8,
+        catchAccessFault = true,
+        compressedGen = false,
+        bigEndian = false
+      )
+    if (!cpuPlugins.exists(p => p.isInstanceOf[SimpleFormalPlugin]))
+      cpuPlugins += new SimpleFormalPlugin
     require(cpuPlugins.exists(p => p.isInstanceOf[IBusSimplePlugin]))
     println(s"resetVector = ${resetVector}")
 
@@ -203,14 +209,13 @@ class VexChip(config: VexChipConfig) extends Component {
       case plugin: IBusSimplePlugin =>
         mainBusArbiter.io.iBus.cmd <> plugin.iBus.cmd
         mainBusArbiter.io.iBus.rsp <> plugin.iBus.rsp
-      case plugin: DBusSimplePlugin => {
+      case plugin: DBusSimplePlugin =>
         if (!pipelineDBus)
           mainBusArbiter.io.dBus <> plugin.dBus
         else {
           mainBusArbiter.io.dBus.cmd << plugin.dBus.cmd.halfPipe()
           mainBusArbiter.io.dBus.rsp <> plugin.dBus.rsp
         }
-      }
       case plugin: CsrPlugin => {
         plugin.externalInterrupt := externalInterrupt
         plugin.timerInterrupt := timerInterrupt
@@ -230,14 +235,20 @@ class VexChip(config: VexChipConfig) extends Component {
 
     //****** MainBus slaves ********
     val mainBusMapping = ArrayBuffer[(PipelinedMemoryBus, SizeMapping)]()
-    val ram = new VexChipPipelinedMemoryBusRam(
+    val ram = if (!replaceMemoryIP)
+      new VexChipPipelinedMemoryBusRam(
+        onChipRamSize = onChipRamSize,
+        onChipRamBinaryFile = onChipRamBinaryFile,
+        pipelinedMemoryBusConfig = pipelinedMemoryBusConfig,
+        bigEndian = bigEndianDBus
+      ) else new VexChipPipelinedMemoryBusDRM(
       onChipRamSize = onChipRamSize,
       onChipRamBinaryFile = onChipRamBinaryFile,
       pipelinedMemoryBusConfig = pipelinedMemoryBusConfig,
       bigEndian = bigEndianDBus
     )
     // mainBusMapping += ram.io.bus -> (0x80000000L, onChipRamSize)
-    mainBusMapping += ram.io.bus -> (resetVector, onChipRamSize)
+    mainBusMapping += ram.getBus -> (resetVector, onChipRamSize)
 
     val apbBridge = new PipelinedMemoryBusToApbBridge(
       apb3Config = Apb3Config(
@@ -386,11 +397,24 @@ object GenVexChipDebug extends App {
     // onChipRamSize = 512 KiB,
     // onChipRamSize = 280 KiB,
     // onChipRamSize = 32 MiB,
-    onChipRamSize = 4 MiB,
-    // onChipRamSize = 65535,
+    // onChipRamSize = 4 MiB,
+    onChipRamSize = 64 KiB,
     coreFrequency = 100 MHz,
     uartBaudRate = 921600,
     resetVector = 0x80000000L,
     negativeReset = false,
+  ), name = "VexChip")
+}
+
+object GenVexChipSynth extends App {
+  run(VexChipConfig.default.copy(
+    onChipRamBinaryFile = makeCoreMarkScratch(),
+    debug = false,
+    onChipRamSize = 64 KiB,
+    coreFrequency = 100 MHz,
+    uartBaudRate = 115200,
+    resetVector = 0x80000000L,
+    negativeReset = false,
+    replaceMemoryIP = true,
   ), name = "VexChip")
 }
