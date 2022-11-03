@@ -7,7 +7,7 @@ import spinal.lib.bus.simple.{PipelinedMemoryBus, PipelinedMemoryBusConfig, Pipe
 import spinal.lib.com.jtag.Jtag
 import spinal.lib.com.uart._
 import spinal.lib.{BufferCC, master, slave}
-import vexriscv.demo.GenVexChip.{makeCoreMark, makeTests, run}
+import vexriscv.demo.GenVexChip._
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
 
@@ -18,7 +18,7 @@ import scala.sys.process._
 
 case class VexChipConfig
 (iCacheSize: Int = 0,
- onChipRamSize: BigInt = 64 kB,
+ onChipRamSize: BigInt = 64 KiB,
  onChipRamBinaryFile: String = null,
  hardwareBreakpointCount: Int = 3,
  pipelineMainBus: Boolean = false,
@@ -136,7 +136,7 @@ class VexChip(config: VexChipConfig) extends Component {
 
     //Implement an counter to keep the reset axiResetOrder high 64 cycles
     // Also this counter will automatically do a reset when the system boot.
-    val systemClkResetCounter = Reg(UInt(6 bits)) init (0)
+    val systemClkResetCounter = Reg(UInt(6 bits)) init 0
     when(systemClkResetCounter =/= U(systemClkResetCounter.range -> true)) {
       systemClkResetCounter := systemClkResetCounter + 1
       mainClkResetUnbuffered := True
@@ -247,7 +247,7 @@ class VexChip(config: VexChipConfig) extends Component {
       pipelineBridge = pipelineApbBridge,
       pipelinedMemoryBusConfig = pipelinedMemoryBusConfig
     )
-    mainBusMapping += apbBridge.io.pipelinedMemoryBus -> (0x54000000L, 1 MB)
+    mainBusMapping += apbBridge.io.pipelinedMemoryBus -> (0x10000000L, 1 MiB)
 
 
     //******** APB peripherals *********
@@ -270,17 +270,18 @@ class VexChip(config: VexChipConfig) extends Component {
       busCanWriteClockDividerConfig = false,
       busCanWriteFrameConfig = false,
       txFifoDepth = 1024,
+      // txFifoDepth = 16,
       rxFifoDepth = 16
     )
 
     val uartCtrl = Apb3UartCtrl(uartCtrlConfig)
     uartCtrl.io.uart <> io.uart
     externalInterrupt setWhen (uartCtrl.io.interrupt)
-    apbMapping += uartCtrl.io.apb -> (0x00000, 4 kB)
+    apbMapping += uartCtrl.io.apb -> (0x00000, 4 KiB)
 
     val timer = new MuraxApb3Timer()
     timerInterrupt setWhen (timer.io.interrupt)
-    apbMapping += timer.io.apb -> (0x20000, 4 kB)
+    apbMapping += timer.io.apb -> (0x20000, 4 KiB)
 
     //******** Memory mappings *********
     val apbDecoder = Apb3Decoder(
@@ -320,6 +321,14 @@ object GenVexChip {
     binary.getAbsolutePath
   }
 
+  def makeCoreMarkScratch(): String = {
+    val baseDir = "./software/coremark/riscv-coremark/scratch"
+    val binary = new File(s"$baseDir/../../overlay/coremark.scratch.bin")
+    val make = s"make -C $baseDir force"
+    require(make.! == 0 && binary.exists(), "Failed to build coremark!")
+    binary.getAbsolutePath
+  }
+
   def makeTests(force: Boolean = true): String = {
     val baseDir = "./software/tests"
     val binary = new File(s"$baseDir/start.rv32.img")
@@ -334,6 +343,21 @@ object GenVexChip {
     binary.getAbsolutePath
   }
 
+  def makeRTThread(force: Boolean = true): String = {
+    val baseDir = "./software/rt-thread"
+    val bspDir = s"$baseDir/bsp/pgl22g"
+    val binary = new File(s"$bspDir/rtthread.bin")
+    // if (force) {
+    //   val clean = s"scons -C $bspDir --clean"
+    //   require(clean.! == 0, "Failed to clean bootrom!")
+    // }
+    if (force || !binary.exists()) {
+      val make = s"scons -C $bspDir"
+      require(make.! == 0 && binary.exists(), "Failed to build bootrom!")
+    }
+    binary.getAbsolutePath
+  }
+
   def run(config: VexChipConfig, name: String = "VexChip"): Unit = {
     SpinalVerilog(VexChip(config).setDefinitionName(name))
   }
@@ -342,7 +366,8 @@ object GenVexChip {
     val filename = if (args.length > 1) args(1) else makeCoreMark()
     val name = if (args.isEmpty) "VexChip" else args(0)
     run(VexChipConfig.default.copy(
-      onChipRamBinaryFile = filename, debug = false,
+      onChipRamBinaryFile = filename,
+      debug = false,
       // onChipRamSize = 280 KiB,
       coreFrequency = 100 MHz,
       resetVector = 0x80000000L,
@@ -353,10 +378,16 @@ object GenVexChip {
 
 object GenVexChipDebug extends App {
   run(VexChipConfig.default.copy(
-    onChipRamBinaryFile = makeCoreMark(), debug = true,
+    // onChipRamBinaryFile = makeCoreMark(),
+    // onChipRamBinaryFile = makeRTThread(),
+    onChipRamBinaryFile = makeCoreMarkScratch(),
+    debug = true,
     // onChipRamBinaryFile = makeTests(), debug = true,
+    // onChipRamSize = 512 KiB,
     // onChipRamSize = 280 KiB,
-    onChipRamSize = 65535,
+    // onChipRamSize = 32 MiB,
+    onChipRamSize = 4 MiB,
+    // onChipRamSize = 65535,
     coreFrequency = 100 MHz,
     uartBaudRate = 921600,
     resetVector = 0x80000000L,
