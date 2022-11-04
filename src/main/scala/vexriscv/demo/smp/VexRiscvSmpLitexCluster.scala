@@ -290,6 +290,8 @@ object VexRiscvLitexSmpClusterOpenSbi extends App{
   simConfig.compile(dutGen).doSimUntilVoid(seed = 42){dut =>
     dut.body.debugCd.inputClockDomain.get.forkStimulus(10)
 
+    val baseDir = "./generator/vex-riscv"
+
     val ram = SparseMemory()
     ram.loadBin(0x80000000l, "../opensbi/build/platform/spinal/vexriscv/sim/smp/firmware/fw_jump.bin")
     ram.loadBin(0xC0000000l, "../buildroot/output/images/Image")

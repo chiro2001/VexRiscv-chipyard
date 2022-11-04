@@ -263,6 +263,7 @@ trait VexRiscvCoreIODMemFullConfig
   //   input      [1:0]    dBus_r_payload_resp,
   //   input               dBus_r_payload_last,
   override def connectDMem(out: AXI4Bundle) = {
+    dBus_aw_ready := out.aw.ready
     out.aw.valid := dBus_aw_valid
     out.aw.bits.id := 0.U
     out.aw.bits.addr := dBus_aw_payload_addr
