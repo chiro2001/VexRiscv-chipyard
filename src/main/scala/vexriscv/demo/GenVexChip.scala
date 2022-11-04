@@ -145,7 +145,7 @@ class VexChip(config: VexChipConfig) extends Component {
       systemClkResetCounter := systemClkResetCounter + 1
       mainClkResetUnbuffered := True
     }
-    when(BufferCC(if (negativeReset) resetInput else resetInputNeg)) {
+    when(BufferCC(if (!negativeReset) resetInput else resetInputNeg)) {
       systemClkResetCounter := 0
     }
 
@@ -411,8 +411,8 @@ object GenVexChipSynth extends App {
     onChipRamBinaryFile = makeCoreMarkScratch(),
     debug = false,
     onChipRamSize = 64 KiB,
-    coreFrequency = 100 MHz,
-    uartBaudRate = 115200,
+    coreFrequency = 50 MHz,
+    uartBaudRate = 921600,
     resetVector = 0x80000000L,
     negativeReset = false,
     replaceMemoryIP = true,
