@@ -210,7 +210,7 @@ object VexOnChip {
 
       axiCrossbar.addPipelining(reqBus)((crossbar, ctrl) => {
         crossbar.sharedCmd.halfPipe() >> ctrl.sharedCmd
-        crossbar.writeData >/-> ctrl.writeData
+        crossbar.writeData.halfPipe() >> ctrl.writeData
         crossbar.writeRsp << ctrl.writeRsp
         crossbar.readRsp << ctrl.readRsp
       })
