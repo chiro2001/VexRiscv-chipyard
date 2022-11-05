@@ -11,6 +11,9 @@ import vexriscv.demo.smp.VexRiscvSmpClusterGen.vexRiscvConfig
 import vexriscv.ip.fpu.{FpuCore, FpuParameter}
 import vexriscv.plugin.{AesPlugin, DBusCachedPlugin, FpuPlugin}
 
+import java.io.File
+import scala.sys.process._
+
 
 case class VexRiscvLitexSmpClusterParameter( cluster : VexRiscvSmpClusterParameter,
                                              liteDram : LiteDramNativeParameter,
@@ -291,12 +294,16 @@ object VexRiscvLitexSmpClusterOpenSbi extends App{
     dut.body.debugCd.inputClockDomain.get.forkStimulus(10)
 
     val baseDir = "./generator/vex-riscv"
+    val softwareBaseDir = "./software"
 
     val ram = SparseMemory()
-    ram.loadBin(0x80000000l, "../opensbi/build/platform/spinal/vexriscv/sim/smp/firmware/fw_jump.bin")
-    ram.loadBin(0xC0000000l, "../buildroot/output/images/Image")
-    ram.loadBin(0xC1000000l, "../buildroot/output/images/dtb")
-    ram.loadBin(0xC2000000l, "../buildroot/output/images/rootfs.cpio")
+    val make = s"make -C software/opensbi CROSS_COMPILE=riscv32-unknown-elf- PLATFORM_RISCV_XLEN=32 PLATFORM=spinal/vexriscv/sim/smp"
+    val sbiBinary = new File(s"$softwareBaseDir/opensbi/build/platform/spinal/vexriscv/sim/smp/firmware/fw_jump.bin")
+    require(make.! == 0 && sbiBinary.exists(), "Failed to build coremark!")
+    ram.loadBin(0x80000000L, sbiBinary.getAbsolutePath)
+    // ram.loadBin(0xC0000000l, "../buildroot/output/images/Image")
+    // ram.loadBin(0xC1000000l, "../buildroot/output/images/dtb")
+    // ram.loadBin(0xC2000000l, "../buildroot/output/images/rootfs.cpio")
 
 
     dut.body.iBridge.dram.simSlave(ram, dut.body.debugCd.inputClockDomain)
@@ -307,8 +314,8 @@ object VexRiscvLitexSmpClusterOpenSbi extends App{
     dut.body.debugCd.inputClockDomain.get.onFallingEdges{
       if(dut.body.peripheral.CYC.toBoolean){
         (dut.body.peripheral.ADR.toLong << 2) match {
-          case 0xF0000000l => print(dut.body.peripheral.DAT_MOSI.toLong.toChar)
-          case 0xF0000004l => dut.body.peripheral.DAT_MISO #= (if(System.in.available() != 0) System.in.read() else 0xFFFFFFFFl)
+          case 0xF0000000L => print(dut.body.peripheral.DAT_MOSI.toLong.toChar)
+          case 0xF0000004L => dut.body.peripheral.DAT_MISO #= (if(System.in.available() != 0) System.in.read() else 0xFFFFFFFFL)
           case _ =>
         }
       }
