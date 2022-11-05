@@ -14,10 +14,12 @@ import scala.language.postfixOps
 
 case class VexOnChipConfig
 (iCacheSize: Int = 4 * 1024,
- onChipRamSize: BigInt = 32 kB,
+ dCacheSize: Int = 4096, // not used here but there
+ onChipRamSize: BigInt = 32 KiB,
  onChipRamBinaryFile: String = null,
  hardwareBreakpointCount: Int = 2,
  replaceMemoryIP: Boolean = false,
+ resetVector: BigInt = VexInterfaceConfig.resetVector,
  cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexOnChipConfig.defaultPlugins(bigEndian = false)) {
 }
 // object VexOnChipConfig {
@@ -177,11 +179,13 @@ object VexOnChip {
         new Axi4SharedOnChipRamMem(
           dataWidth = 32,
           byteCount = onChipRamSize,
-          idWidth = 4
+          idWidth = 4,
+          onChipRamBinaryFile = onChipRamBinaryFile
         ) else Axi4SharedOnChipRamDRM(
         dataWidth = 32,
         byteCount = onChipRamSize,
-        idWidth = 4
+        idWidth = 4,
+        onChipRamBinaryFile = onChipRamBinaryFile
       )).setName("onchip_mem")
 
 

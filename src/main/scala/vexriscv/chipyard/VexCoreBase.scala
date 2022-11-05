@@ -16,7 +16,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.amba.axi4.AXI4Bundle
 import spinal.core.SpinalConfig
-import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAXIJTAGCore, VexInterfaceConfig, VexOnChip, VexOnChipConfig}
+import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAXIJTAGConfig, VexAXIJTAGCore, VexInterfaceConfig, VexOnChip, VexOnChipConfig}
 // import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 
@@ -341,7 +341,7 @@ class VexRiscvCoreIOPartAXI extends Bundle
   with VexRiscvCoreIODMemPartConfig
   with VexRiscvCoreIOBasic
 
-abstract class VexCoreBase(onChopRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
+abstract class VexCoreBase(onChipRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
   extends BlackBox
     with HasBlackBoxPath {
   val io: VexRiscvCoreIOBasic with VexRiscvCoreIODMemConnector
@@ -355,12 +355,17 @@ abstract class VexCoreBase(onChopRAM: Boolean, moduleName: String = "VexCore")(i
     require(file.delete(), s"Waring: cannot delete file $file")
   }
 
-  if (onChopRAM) {
-    val config = p(VexRiscvConfigKey)
+  val config = p(VexRiscvConfigKey)
+  if (onChipRAM) {
     println(s"VexCore OnChip generate with Config: ${config}")
     GenVexOnChip.run(config, name = moduleName)
   } else {
-    VexAXIJTAGCore.run()
+    VexAXIJTAGCore.run(VexAXIJTAGConfig.default.copy(
+      iCacheSize = config.iCacheSize,
+      dCacheSize = config.dCacheSize,
+      hardwareBreakpointCount = config.hardwareBreakpointCount,
+      resetVector = config.resetVector
+    ))
   }
 
   addPath(targetVerilogFile)

@@ -43,6 +43,14 @@ class WithVexICacheSize(iCacheSize: Int = 4 * 1024) extends Config((site, here, 
   case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(iCacheSize = iCacheSize)
 })
 
+class WithVexDCacheSize(dCacheSize: Int = 4 * 1024) extends Config((site, here, up) => {
+  case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(dCacheSize = dCacheSize)
+})
+
 class WithVexOnChipMemSize(onChipMemSize: BigInt = 32 * 1024) extends Config((site, here, up) => {
   case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(onChipRamSize = onChipMemSize)
+})
+
+class WithVexOnChipMemFile(binaryFile: String) extends Config((site, here, up) => {
+  case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(onChipRamBinaryFile = binaryFile)
 })

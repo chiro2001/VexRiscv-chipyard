@@ -5,7 +5,7 @@ import spinal.lib.bus.amba4.axi.{Axi4Shared, Axi4SharedOnChipRam}
 import spinal.lib.bus.simple.{PipelinedMemoryBus, PipelinedMemoryBusConfig}
 import spinal.lib.misc.HexTools
 import spinal.lib.slave
-import vexriscv.demo.VexChipUtils.generateFromBinaryFile
+import vexriscv.demo.VexChipUtils.{generateFromBinaryFile, ramInitFromBinaryFile}
 
 import java.io.{File, PrintWriter}
 import scala.collection.mutable.ArrayBuffer
@@ -34,6 +34,7 @@ object VexChipUtils {
         Nil
     }
   }
+
   def generateFromBinaryFile(onChipRamBinaryFile: String, targetFile: String = null): String = {
     // TODO: generate_ip
     val targetFileUse = if (targetFile != null) new File(targetFile) else new File(onChipRamBinaryFile + ".dat")
@@ -57,6 +58,18 @@ object VexChipUtils {
       pw.close()
     }
     targetFileUse.getAbsolutePath
+  }
+
+  def ramInitFromBinaryFile(ram: Mem[Bits], onChipRamBinaryFile: String) = {
+    if (onChipRamBinaryFile != null) {
+      val wordSize = ram.wordType.getBitsWidth / 8
+      val initContent = Array.fill[BigInt](ram.wordCount)(0)
+      val fileContent = VexChipUtils.readBinaryFile(onChipRamBinaryFile)
+      println(s"mem file size ${fileContent.size / 1024} kB (${fileContent.size} Bytes)")
+      val fileWords = fileContent.grouped(wordSize).toList
+      (0 until ram.wordCount).zip(fileWords).foreach(x => x._2.zipWithIndex.foreach(i => initContent(x._1) |= (BigInt(i._1) << (i._2 * 8))))
+      ram.initBigInt(initContent)
+    }
   }
 }
 
@@ -88,15 +101,7 @@ case class VexChipPipelinedMemoryBusRam
   )
   io.bus.cmd.ready := True
 
-  if (onChipRamBinaryFile != null) {
-    val wordSize = ram.wordType.getBitsWidth / 8
-    val initContent = Array.fill[BigInt](ram.wordCount)(0)
-    val fileContent = VexChipUtils.readBinaryFile(onChipRamBinaryFile)
-    println(s"mem file size ${fileContent.size / 1024} kB (${fileContent.size} Bytes)")
-    val fileWords = fileContent.grouped(wordSize).toList
-    (0 until ram.wordCount).zip(fileWords).foreach(x => x._2.zipWithIndex.foreach(i => initContent(x._1) |= (BigInt(i._1) << (i._2 * 8))))
-    ram.initBigInt(initContent)
-  }
+  ramInitFromBinaryFile(ram, onChipRamBinaryFile)
 }
 
 case class VexChipPipelinedMemoryBusDRM
@@ -133,12 +138,14 @@ trait Axi4SharedOnChipRamWithAXIPort {
   // def setName(name: String): Axi4SharedOnChipRamWithAXIPort
 }
 
-class Axi4SharedOnChipRamMem(dataWidth: Int, byteCount: BigInt, idWidth: Int, arwStage: Boolean = false)
+class Axi4SharedOnChipRamMem(dataWidth: Int, byteCount: BigInt, idWidth: Int, arwStage: Boolean = false, onChipRamBinaryFile: String = null)
   extends Axi4SharedOnChipRam(dataWidth, byteCount, idWidth, arwStage)
     with Axi4SharedOnChipRamWithAXIPort {
   override def getAXIPort = io.axi
 
   override type RefOwnerType = this.type
+
+  ramInitFromBinaryFile(ram, onChipRamBinaryFile)
 }
 
 case class Axi4SharedOnChipRamDRM

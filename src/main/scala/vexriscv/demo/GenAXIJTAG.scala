@@ -3,17 +3,26 @@ package vexriscv.demo
 import spinal.core._
 import spinal.lib._
 import spinal.lib.bus.amba4.axi.Axi4ReadOnly
-import spinal.lib.bus.avalon.AvalonMM
 import spinal.lib.com.jtag.Jtag
-import spinal.lib.eda.altera.{InterruptReceiverTag, QSysify, ResetEmitterTag}
+import spinal.lib.eda.altera.{InterruptReceiverTag, ResetEmitterTag}
+// import vexriscv.demo.VexInterfaceConfig._
 import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig}
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
-import VexInterfaceConfig._
-import vexriscv.demo.VexAXIJTAGCore.run
+
+case class VexAXIJTAGConfig
+(iCacheSize: Int = 4096,
+ dCacheSize: Int = 4096,
+ hardwareBreakpointCount: Int = 3,
+ resetVector: BigInt = vexriscv.demo.VexInterfaceConfig.resetVector)
+
+object VexAXIJTAGConfig {
+  def default = VexAXIJTAGConfig()
+}
 
 object VexAXIJTAGCore {
-  def run(): Unit = {
+  def run(config: VexAXIJTAGConfig): Unit = {
+    import config._
     val report = SpinalVerilog {
       //CPU configuration
       val cpuConfig = VexRiscvConfig(
@@ -27,10 +36,10 @@ object VexAXIJTAGCore {
           //            catchAddressMisaligned = false,
           //            catchAccessFault = false
           //          ),
-          if (!useSimpleIBus) new IBusCachedPlugin(
-            prediction = STATIC,
+          if (iCacheSize != 0) new IBusCachedPlugin(
+            prediction = DYNAMIC_TARGET,
             config = InstructionCacheConfig(
-              cacheSize = 4096,
+              cacheSize = iCacheSize,
               bytePerLine = 32,
               wayCount = 1,
               addressWidth = 32,
@@ -50,9 +59,9 @@ object VexAXIJTAGCore {
             resetVector = resetVector,
             false, true
           ),
-          if (!useSimpleDBus) new DBusCachedPlugin(
+          if (dCacheSize != 0) new DBusCachedPlugin(
             config = new DataCacheConfig(
-              cacheSize = 4096,
+              cacheSize = dCacheSize,
               bytePerLine = 32,
               wayCount = 1,
               addressWidth = 32,
@@ -204,5 +213,5 @@ object VexAXIJTAGCore {
 }
 
 object GenAXIJTAG extends App {
-  VexAXIJTAGCore.run()
+  VexAXIJTAGCore.run(VexAXIJTAGConfig.default)
 }
