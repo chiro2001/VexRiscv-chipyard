@@ -10,18 +10,18 @@ import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig}
 import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
 
-case class VexAXIJTAGConfig
+case class VexAxiJTAGConfig
 (iCacheSize: Int = 4096,
  dCacheSize: Int = 4096,
  hardwareBreakpointCount: Int = 3,
  resetVector: BigInt = vexriscv.demo.VexInterfaceConfig.resetVector)
 
-object VexAXIJTAGConfig {
-  def default = VexAXIJTAGConfig()
+object VexAxiJTAGConfig {
+  def default = VexAxiJTAGConfig()
 }
 
-object VexAXIJTAGCore {
-  def run(config: VexAXIJTAGConfig): Unit = {
+object VexAxiJTAGCore {
+  def run(config: VexAxiJTAGConfig): Unit = {
     import config._
     val report = SpinalVerilog {
       //CPU configuration
@@ -37,6 +37,7 @@ object VexAXIJTAGCore {
           //            catchAccessFault = false
           //          ),
           if (iCacheSize != 0) new IBusCachedPlugin(
+            resetVector = resetVector,
             prediction = DYNAMIC_TARGET,
             config = InstructionCacheConfig(
               cacheSize = iCacheSize,
@@ -49,12 +50,15 @@ object VexAXIJTAGCore {
               catchAccessFault = true,
               asyncTagMemory = false,
               twoCycleRam = true,
-              twoCycleCache = true
-            )
-            //            askMemoryTranslation = true,
-            //            memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
-            //              portTlbSize = 4
-            //            )
+              twoCycleCache = true),
+            memoryTranslatorPortConfig = null
+            // askMemoryTranslation = true,
+            // memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
+            //   portTlbSize = 4
+            // )
+            // memoryTranslatorPortConfig = if (iCacheSize != 0) MmuPortConfig(
+            //   portTlbSize = 4
+            // ) else null
           ) else new IBusSimplePlugin(
             resetVector = resetVector,
             false, true
@@ -71,16 +75,25 @@ object VexAXIJTAGCore {
               catchIllegal = true,
               catchUnaligned = true
             ),
-            memoryTranslatorPortConfig = null
-            //            memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
-            //              portTlbSize = 6
-            //            )
+            memoryTranslatorPortConfig = null,
+            // memoryTranslatorPortConfig = MemoryTranslatorPortConfig(
+            //   portTlbSize = 6
+            // )
+            // memoryTranslatorPortConfig = if (dCacheSize != 0) MmuPortConfig(
+            //   portTlbSize = 4
+            // ) else null
           ) else new DBusSimplePlugin(
             catchAddressMisaligned = true,
             catchAccessFault = true
           ),
+          // if (iCacheSize != 0 || dCacheSize != 0)
+          //   new MmuPlugin(
+          //     virtualRange = _ (31 downto 28) === 0xC,
+          //     ioRange = _ (31 downto 28) === 0xF
+          //   ) else
           new StaticMemoryTranslatorPlugin(
-            ioRange = _ (31 downto 28) === 0xF
+            ioRange = _ (31 downto 24) === 0x54
+            // ioRange = _ (31 downto 28) === 0xF
           ),
           new DecoderSimplePlugin(
             catchIllegalInstruction = true
@@ -95,8 +108,15 @@ object VexAXIJTAGCore {
             executeInsertion = true
           ),
           new FullBarrelShifterPlugin,
+          // new MulPlugin,
+          // new DivPlugin,
           new MulPlugin,
-          new DivPlugin,
+          new MulDivIterativePlugin(
+            genMul = false,
+            genDiv = true,
+            mulUnrollFactor = 32,
+            divUnrollFactor = 1
+          ),
           new HazardSimplePlugin(
             bypassExecute = true,
             bypassMemory = true,
@@ -151,6 +171,7 @@ object VexAXIJTAGCore {
               pipelineCsrRead = false,
               deterministicInteruptionEntry = false
             )
+            // CsrPluginConfig.linuxMinimal(0x80000020L).copy(ebreakGen = false)
           ),
           new YamlPlugin("cpu0.yaml")
         )
@@ -212,6 +233,6 @@ object VexAXIJTAGCore {
   }
 }
 
-object GenAXIJTAG extends App {
-  VexAXIJTAGCore.run(VexAXIJTAGConfig.default)
+object GenAxiJTAG extends App {
+  VexAxiJTAGCore.run(VexAxiJTAGConfig.default)
 }

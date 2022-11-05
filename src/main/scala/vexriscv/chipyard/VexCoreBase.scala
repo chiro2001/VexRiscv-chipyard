@@ -16,7 +16,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.amba.axi4.AXI4Bundle
 import spinal.core.SpinalConfig
-import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAXIJTAGConfig, VexAXIJTAGCore, VexInterfaceConfig, VexOnChip, VexOnChipConfig}
+import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAxiJTAGConfig, VexAxiJTAGCore, VexInterfaceConfig, VexOnChip, VexOnChipConfig}
 // import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
 
@@ -356,11 +356,11 @@ abstract class VexCoreBase(onChipRAM: Boolean, moduleName: String = "VexCore")(i
   }
 
   val config = p(VexRiscvConfigKey)
+  println(s"VexCore OnChip generate with Config: ${config}")
   if (onChipRAM) {
-    println(s"VexCore OnChip generate with Config: ${config}")
     GenVexOnChip.run(config, name = moduleName)
   } else {
-    VexAXIJTAGCore.run(VexAXIJTAGConfig.default.copy(
+    VexAxiJTAGCore.run(VexAxiJTAGConfig.default.copy(
       iCacheSize = config.iCacheSize,
       dCacheSize = config.dCacheSize,
       hardwareBreakpointCount = config.hardwareBreakpointCount,

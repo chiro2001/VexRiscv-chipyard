@@ -101,7 +101,7 @@ object VexOnChip {
           resetVector = resetVector,
           cmdForkOnSecondStage = true,
           cmdForkPersistence = true,
-          prediction = STATIC,
+          prediction = DYNAMIC_TARGET,
           catchAccessFault = false,
           compressedGen = false,
           bigEndian = false
@@ -193,7 +193,8 @@ object VexOnChip {
 
       axiCrossbar.addSlaves(
         ram.getAXIPort -> (0x80000000L, onChipRamSize),
-        reqBus -> (0x00000000L, BigInt(0x80000000L))
+        // reqBus -> (0x00000000L, BigInt(0x80000000L))
+        reqBus -> (0x00000000L, BigInt(0x70000000L))
       )
 
       axiCrossbar.addConnections(
@@ -207,7 +208,14 @@ object VexOnChip {
         crossbar.readRsp << ctrl.readRsp
       })
 
-      axiCrossbar.addPipelining(reqBus)((cpu, crossbar) => {
+      axiCrossbar.addPipelining(reqBus)((crossbar, ctrl) => {
+        crossbar.sharedCmd.halfPipe() >> ctrl.sharedCmd
+        crossbar.writeData >/-> ctrl.writeData
+        crossbar.writeRsp << ctrl.writeRsp
+        crossbar.readRsp << ctrl.readRsp
+      })
+
+      axiCrossbar.addPipelining(dBus)((cpu, crossbar) => {
         cpu.sharedCmd >> crossbar.sharedCmd
         cpu.writeData >> crossbar.writeData
         cpu.writeRsp << crossbar.writeRsp

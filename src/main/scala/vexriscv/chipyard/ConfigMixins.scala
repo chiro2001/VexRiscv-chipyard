@@ -26,6 +26,7 @@ class WithNVexRiscvCores(n: Int = 1, overrideIdOffset: Option[Int] = None, onChi
     val prev = up(TilesLocated(InSubsystem), site)
     val idOffset = overrideIdOffset.getOrElse(prev.size)
     (0 until n).map { i =>
+      // println(s"VexRiscvCore #$i, onChipRAM=$onChipRAM, resetVector=${site(VexRiscvConfigKey).resetVector}")
       VexRiscvTileAttachParams(
         tileParams = VexRiscvTileParams(hartId = i + idOffset, trace = true, onChipRAM = onChipRAM),
         crossingParams = RocketCrossingParams()
@@ -42,29 +43,48 @@ class WithVexDefaultConfig extends Config((site, here, up) => {
   case VexRiscvConfigKey => VexOnChipConfig.default
 })
 
+class WithVexConfig(config: VexOnChipConfig) extends Config((site, here, up) => {
+  case VexRiscvConfigKey => config
+})
+
+@Deprecated
 class WithVexICacheSize(iCacheSize: Int = 4 * 1024) extends Config((site, here, up) => {
   case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(iCacheSize = iCacheSize)
 })
 
+@Deprecated
 class WithVexDCacheSize(dCacheSize: Int = 4 * 1024) extends Config((site, here, up) => {
   case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(dCacheSize = dCacheSize)
 })
 
+@Deprecated
 class WithVexOnChipMemSize(onChipMemSize: BigInt = 32 * 1024) extends Config((site, here, up) => {
   case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(onChipRamSize = onChipMemSize)
 })
 
+@Deprecated
 class WithVexOnChipMemFile(binaryFile: String) extends Config((site, here, up) => {
   case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(onChipRamBinaryFile = binaryFile)
 })
 
+@Deprecated
+class WithVexResetVector(resetVector: BigInt = 0x10000L) extends Config((site, here, up) => {
+  case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(resetVector = resetVector)
+})
+
+object BootRoms {
+  def onChipCoreMark: String = {
+    val binaryFile = new File("./software/coremark/overlay/coremark.perf.bin")
+    // val clean = s"make -C ./software/coremark/riscv-coremark/perf clean"
+    // require(clean.! == 0 && !binaryFile.exists(), "failed to clean coremark for vex-riscv!")
+    val make = s"make -C ./software/coremark/riscv-coremark/perf"
+    if (!binaryFile.exists()) require(make.! == 0, "failed to make coremark for vex-riscv!")
+    binaryFile.getAbsolutePath
+  }
+}
+
 class WithVexOnChipCoreMark extends Config((site, here, up) => {
   case VexRiscvConfigKey => {
-    val binaryFile = new File("./software/coremark/overlay/coremark.perf.bin")
-    val clean = s"make -C ./software/coremark/riscv-coremark/perf clean"
-    require(clean.! == 0 && !binaryFile.exists(), "failed to clean coremark for vex-riscv!")
-    val make = s"make -C ./software/coremark/riscv-coremark/perf"
-    require(make.! == 0 && binaryFile.exists(), "failed to make coremark for vex-riscv!")
-    up(VexRiscvConfigKey, site).copy(onChipRamBinaryFile = binaryFile.getAbsolutePath)
+    up(VexRiscvConfigKey, site).copy(onChipRamBinaryFile = BootRoms.onChipCoreMark)
   }
 })
