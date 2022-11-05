@@ -23,6 +23,7 @@ object VexAxiJTAGConfig {
 object VexAxiJTAGCore {
   def run(config: VexAxiJTAGConfig): Unit = {
     import config._
+    println(s"GenAxiJTAG with config: ${config}")
     val report = SpinalVerilog {
       //CPU configuration
       val cpuConfig = VexRiscvConfig(
@@ -61,7 +62,8 @@ object VexAxiJTAGCore {
             // ) else null
           ) else new IBusSimplePlugin(
             resetVector = resetVector,
-            false, true
+            false, true,
+            catchAccessFault = true
           ),
           if (dCacheSize != 0) new DBusCachedPlugin(
             config = new DataCacheConfig(
