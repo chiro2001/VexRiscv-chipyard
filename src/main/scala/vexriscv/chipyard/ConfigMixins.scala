@@ -11,6 +11,9 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.tile._
 import vexriscv.demo.VexOnChipConfig
 
+import java.io.File
+import sys.process._
+
 /**
  * Create multiple copies of a VexRiscv tile (and thus a core).
  * Override with the default mixins to control all params of the tiles.
@@ -53,4 +56,15 @@ class WithVexOnChipMemSize(onChipMemSize: BigInt = 32 * 1024) extends Config((si
 
 class WithVexOnChipMemFile(binaryFile: String) extends Config((site, here, up) => {
   case VexRiscvConfigKey => up(VexRiscvConfigKey, site).copy(onChipRamBinaryFile = binaryFile)
+})
+
+class WithVexOnChipCoreMark extends Config((site, here, up) => {
+  case VexRiscvConfigKey => {
+    val binaryFile = new File("./software/coremark/overlay/coremark.perf.bin")
+    val clean = s"make -C ./software/coremark/riscv-coremark/perf clean"
+    require(clean.! == 0 && !binaryFile.exists(), "failed to clean coremark for vex-riscv!")
+    val make = s"make -C ./software/coremark/riscv-coremark/perf"
+    require(make.! == 0 && binaryFile.exists(), "failed to make coremark for vex-riscv!")
+    up(VexRiscvConfigKey, site).copy(onChipRamBinaryFile = binaryFile.getAbsolutePath)
+  }
 })
