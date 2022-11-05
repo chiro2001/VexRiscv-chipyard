@@ -1,9 +1,11 @@
 package vexriscv.demo
 
 import spinal.core._
+import spinal.lib.bus.amba4.axi.{Axi4Shared, Axi4SharedOnChipRam}
 import spinal.lib.bus.simple.{PipelinedMemoryBus, PipelinedMemoryBusConfig}
 import spinal.lib.misc.HexTools
 import spinal.lib.slave
+import vexriscv.demo.VexChipUtils.generateFromBinaryFile
 
 import java.io.{File, PrintWriter}
 import scala.collection.mutable.ArrayBuffer
@@ -31,6 +33,30 @@ object VexChipUtils {
         e.printStackTrace()
         Nil
     }
+  }
+  def generateFromBinaryFile(onChipRamBinaryFile: String, targetFile: String = null): String = {
+    // TODO: generate_ip
+    val targetFileUse = if (targetFile != null) new File(targetFile) else new File(onChipRamBinaryFile + ".dat")
+    if (onChipRamBinaryFile != null) {
+      // Generate HEX text file
+      val wordSize = 4
+      val wordCount = ((64 KiB) / wordSize).toInt
+      val initContent = Array.fill[BigInt](wordCount)(0)
+      val fileContent = VexChipUtils.readBinaryFile(onChipRamBinaryFile)
+      println(s"mem file size ${fileContent.size / 1024} kB (${fileContent.size} Bytes)")
+      val fileWords = fileContent.grouped(wordSize).toList
+      (0 until wordCount).zip(fileWords).foreach(x => x._2.zipWithIndex.foreach(i => initContent(x._1) |= (BigInt(i._1) << (i._2 * 8))))
+      // ram.initBigInt(initContent)
+      val pw = new PrintWriter(targetFileUse)
+      for (word <- initContent) {
+        // println(s"${word.toHexString}")
+        val w = word.toLong.toHexString
+        val filled = Seq.fill(8 - w.length)('0').mkString("") + w
+        pw.write(filled + "\n")
+      }
+      pw.close()
+    }
+    targetFileUse.getAbsolutePath
   }
 }
 
@@ -98,26 +124,67 @@ case class VexChipPipelinedMemoryBusDRM
     mask = io.bus.cmd.mask
   )
   io.bus.cmd.ready := True
-  if (onChipRamBinaryFile != null) {
-    // Generate HEX text file
-    val wordSize = 4
-    val wordCount = ((64 KiB) / wordSize).toInt
-    val initContent = Array.fill[BigInt](wordCount)(0)
-    val fileContent = VexChipUtils.readBinaryFile(onChipRamBinaryFile)
-    println(s"mem file size ${fileContent.size / 1024} kB (${fileContent.size} Bytes)")
-    val fileWords = fileContent.grouped(wordSize).toList
-    (0 until wordCount).zip(fileWords).foreach(x => x._2.zipWithIndex.foreach(i => initContent(x._1) |= (BigInt(i._1) << (i._2 * 8))))
-    // ram.initBigInt(initContent)
-    val targetFile = new File(onChipRamBinaryFile + ".dat")
-    val pw = new PrintWriter(targetFile)
-    for (word <- initContent) {
-      // println(s"${word.toHexString}")
-      val w = word.toLong.toHexString
-      val filled = Seq.fill(8 - w.length)('0').mkString("") + w
-      pw.write(filled + "\n")
-    }
-    pw.close()
+  generateFromBinaryFile(onChipRamBinaryFile)
+}
+
+trait Axi4SharedOnChipRamWithAXIPort {
+  def getAXIPort: Axi4Shared
+
+  // def setName(name: String): Axi4SharedOnChipRamWithAXIPort
+}
+
+class Axi4SharedOnChipRamMem(dataWidth: Int, byteCount: BigInt, idWidth: Int, arwStage: Boolean = false)
+  extends Axi4SharedOnChipRam(dataWidth, byteCount, idWidth, arwStage)
+    with Axi4SharedOnChipRamWithAXIPort {
+  override def getAXIPort = io.axi
+
+  override type RefOwnerType = this.type
+}
+
+case class Axi4SharedOnChipRamDRM
+(dataWidth: Int, byteCount: BigInt, idWidth: Int, arwStage: Boolean = false, onChipRamBinaryFile: String = null)
+  extends Component
+    with Axi4SharedOnChipRamWithAXIPort {
+  val axiConfig = Axi4SharedOnChipRam.getAxiConfig(dataWidth, byteCount, idWidth)
+
+  val io = new Bundle {
+    val axi = slave(Axi4Shared(axiConfig))
   }
+
+  override def getAXIPort = io.axi
+
+  val wordCount = byteCount / axiConfig.bytePerWord
+  // val ram = Mem(axiConfig.dataType,wordCount.toInt)
+  val ram = new drm_32x16384
+  generateFromBinaryFile(onChipRamBinaryFile)
+  val wordRange = log2Up(wordCount) + log2Up(axiConfig.bytePerWord) - 1 downto log2Up(axiConfig.bytePerWord)
+
+  val arw = if (arwStage) io.axi.arw.s2mPipe().unburstify.m2sPipe() else io.axi.arw.unburstify
+  val stage0 = arw.haltWhen(arw.write && !io.axi.writeData.valid)
+  io.axi.readRsp.data := ram.readWriteSync(
+    address = stage0.addr(axiConfig.wordRange).resized,
+    data = io.axi.writeData.data,
+    enable = stage0.fire,
+    write = stage0.write,
+    mask = io.axi.writeData.strb
+  )
+  io.axi.writeData.ready := arw.valid && arw.write && stage0.ready
+
+  val stage1 = stage0.stage()
+  stage1.ready := (io.axi.readRsp.ready && !stage1.write) || ((io.axi.writeRsp.ready || !stage1.last) && stage1.write)
+
+  io.axi.readRsp.valid := stage1.valid && !stage1.write
+  io.axi.readRsp.id := stage1.id
+  io.axi.readRsp.last := stage1.last
+  io.axi.readRsp.setOKAY()
+  if (axiConfig.useRUser) io.axi.readRsp.user := stage1.user
+
+  io.axi.writeRsp.valid := stage1.valid && stage1.write && stage1.last
+  io.axi.writeRsp.setOKAY()
+  io.axi.writeRsp.id := stage1.id
+  if (axiConfig.useBUser) io.axi.writeRsp.user := stage1.user
+
+  io.axi.arw.ready.noBackendCombMerge //Verilator perf
 }
 
 class drm_32x16384 extends BlackBox {

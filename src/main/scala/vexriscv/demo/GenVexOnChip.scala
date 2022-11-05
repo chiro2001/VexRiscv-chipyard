@@ -15,8 +15,9 @@ import scala.language.postfixOps
 case class VexOnChipConfig
 (iCacheSize: Int = 4 * 1024,
  onChipRamSize: BigInt = 32 kB,
- onChipRamHexFile: String = null,
+ onChipRamBinaryFile: String = null,
  hardwareBreakpointCount: Int = 2,
+ replaceMemoryIP: Boolean = false,
  cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexOnChipConfig.defaultPlugins(bigEndian = false)) {
 }
 // object VexOnChipConfig {
@@ -172,25 +173,30 @@ object VexOnChip {
 
       val reqBus = dBus.copy()
 
-      val ram = Axi4SharedOnChipRam(
+      val ram: Axi4SharedOnChipRamWithAXIPort = (if (!replaceMemoryIP)
+        new Axi4SharedOnChipRamMem(
+          dataWidth = 32,
+          byteCount = onChipRamSize,
+          idWidth = 4
+        ) else Axi4SharedOnChipRamDRM(
         dataWidth = 32,
         byteCount = onChipRamSize,
         idWidth = 4
-      ).setName("onchip_mem")
+      )).setName("onchip_mem")
 
 
       val axiCrossbar = Axi4CrossbarFactory()
 
       axiCrossbar.addSlaves(
-        ram.io.axi -> (0x80000000L, onChipRamSize),
+        ram.getAXIPort -> (0x80000000L, onChipRamSize),
         reqBus -> (0x00000000L, BigInt(0x80000000L))
       )
 
       axiCrossbar.addConnections(
-        dBus -> List(ram.io.axi, reqBus)
+        dBus -> List(ram.getAXIPort, reqBus)
       )
 
-      axiCrossbar.addPipelining(ram.io.axi)((crossbar, ctrl) => {
+      axiCrossbar.addPipelining(ram.getAXIPort)((crossbar, ctrl) => {
         crossbar.sharedCmd.halfPipe() >> ctrl.sharedCmd
         crossbar.writeData >/-> ctrl.writeData
         crossbar.writeRsp << ctrl.writeRsp
