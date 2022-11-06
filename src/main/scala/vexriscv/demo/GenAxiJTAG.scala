@@ -179,7 +179,8 @@ object VexAxiJTAGCore {
             )
             // CsrPluginConfig.linuxMinimal(0x80000020L).copy(ebreakGen = false)
           ),
-          new YamlPlugin("cpu0.yaml")
+          new YamlPlugin("cpu0.yaml"),
+          new SimpleFormalPlugin
         )
       )
 
@@ -230,6 +231,10 @@ object VexAxiJTAGCore {
               .addTag(InterruptReceiverTag(iBus, ClockDomain.current))
             plugin.timerInterrupt
               .addTag(InterruptReceiverTag(iBus, ClockDomain.current))
+          }
+          case plugin: SimpleFormalPlugin => {
+            println("Enabled SimpleFormalPlugin")
+            master(plugin.rvfi).setName("rvfi")
           }
           case _ =>
         }

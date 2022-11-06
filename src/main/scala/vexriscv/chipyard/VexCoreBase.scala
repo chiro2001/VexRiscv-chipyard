@@ -331,7 +331,7 @@ trait VexRiscvCoreIOBasic extends Bundle
   with VexRiscvCoreIOBase
   with VexRiscvCoreIOIRQ
   with VexRiscvCoreIOIMem
-  // with VexRiscvCoreIOIRvfi
+  with VexRiscvCoreIOIRvfi
   with VexRiscvCoreIOJtag
 
 class VexRiscvCoreIOFullAXI extends Bundle
