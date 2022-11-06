@@ -40,6 +40,7 @@ object VexAxiJTAGCore {
           if (iCacheSize != 0) new IBusCachedPlugin(
             resetVector = resetVector,
             prediction = DYNAMIC_TARGET,
+            historyRamSizeLog2 = 8,
             config = InstructionCacheConfig(
               cacheSize = iCacheSize,
               bytePerLine = 32,
@@ -50,7 +51,7 @@ object VexAxiJTAGCore {
               catchIllegalAccess = true,
               catchAccessFault = true,
               asyncTagMemory = false,
-              twoCycleRam = true,
+              twoCycleRam = false,
               twoCycleCache = true),
             memoryTranslatorPortConfig = null
             // askMemoryTranslation = true,
@@ -112,15 +113,15 @@ object VexAxiJTAGCore {
             executeInsertion = true
           ),
           new FullBarrelShifterPlugin,
-          // new MulPlugin,
-          // new DivPlugin,
           new MulPlugin,
-          new MulDivIterativePlugin(
-            genMul = false,
-            genDiv = true,
-            mulUnrollFactor = 32,
-            divUnrollFactor = 1
-          ),
+          new DivPlugin,
+          // new MulPlugin,
+          // new MulDivIterativePlugin(
+          //   genMul = false,
+          //   genDiv = true,
+          //   mulUnrollFactor = 32,
+          //   divUnrollFactor = 1
+          // ),
           new HazardSimplePlugin(
             bypassExecute = true,
             bypassMemory = true,
