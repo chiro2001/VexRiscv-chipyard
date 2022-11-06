@@ -36,7 +36,7 @@ case class VexRiscvCoreParams
   val useDebug: Boolean = false
   val useAtomics: Boolean = true
   val useAtomicsOnlyForIO: Boolean = false // copied from Rocket
-  val useCompressed: Boolean = true
+  val useCompressed: Boolean = false
   override val useVector: Boolean = false
   val useSCIE: Boolean = false
   val useRVE: Boolean = false

@@ -33,7 +33,7 @@ class WithNVexRiscvCores(n: Int = 1, overrideIdOffset: Option[Int] = None, onChi
       )
     } ++ prev
   }
-  case SystemBusKey => up(SystemBusKey, site).copy(beatBytes = 8)
+  case SystemBusKey => up(SystemBusKey, site).copy(beatBytes = 4)
   case XLen => 32
 })
 

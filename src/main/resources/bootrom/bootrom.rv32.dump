@@ -26,7 +26,7 @@ Disassembly of section .text:
    10038:	02010413          	addi	s0,sp,32
    1003c:	010007b7          	lui	a5,0x1000
    10040:	fef42623          	sw	a5,-20(s0)
-   10044:	200007b7          	lui	a5,0x20000
+   10044:	201007b7          	lui	a5,0x20100
    10048:	fef42423          	sw	a5,-24(s0)
    1004c:	800007b7          	lui	a5,0x80000
    10050:	fef42223          	sw	a5,-28(s0)

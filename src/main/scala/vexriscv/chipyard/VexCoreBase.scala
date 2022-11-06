@@ -271,7 +271,7 @@ trait VexRiscvCoreIODMemFullConfig
     out.aw.bits.size := dBus_aw_payload_size
     out.aw.bits.burst := dBus_aw_payload_burst
     out.aw.bits.lock := dBus_aw_payload_lock
-    out.aw.bits.cache := dBus_aw_payload_cache
+    out.aw.bits.cache := dBus_aw_payload_cache & 0.U
     out.aw.bits.prot := dBus_aw_payload_prot
     out.aw.bits.qos := dBus_aw_payload_qos
 
@@ -293,7 +293,7 @@ trait VexRiscvCoreIODMemFullConfig
     out.ar.bits.size := dBus_ar_payload_size
     out.ar.bits.burst := dBus_ar_payload_burst
     out.ar.bits.lock := dBus_ar_payload_lock
-    out.ar.bits.cache := dBus_ar_payload_cache
+    out.ar.bits.cache := dBus_ar_payload_cache & 0.U
     out.ar.bits.prot := dBus_ar_payload_prot
     out.ar.bits.qos := dBus_ar_payload_qos
 
