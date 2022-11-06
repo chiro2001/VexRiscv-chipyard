@@ -1,6 +1,6 @@
-bootrom_elf = bootrom.rv32.elf
-bootrom_img = bootrom.rv32.img
-bootrom_dump = bootrom.rv32.dump
+bootrom_elf = bootrom.rv32.elf bootrom.sim.rv32.elf
+bootrom_img = bootrom.rv32.img bootrom.sim.rv32.img
+bootrom_dump = bootrom.rv32.dump bootrom.sim.rv32.dump
 
 CROSS_COMPILE := riscv-none-embed-
 GCC=$(CROSS_COMPILE)gcc
@@ -22,8 +22,8 @@ elf: $(bootrom_elf)
 %.rv32.elf: %.S linker.ld
 	$(GCC) $(CFLAGS_RV32) -Tlinker.ld $< copy_flash.c -nostdlib -static -o $@
 
-%.rv32.simple.elf: %_simple.S linker.ld
-	$(GCC) $(CFLAGS_RV32) -Tlinker.ld bootrom_simple.S -nostdlib -static -o $@
+%.sim.rv32.elf: %.sim.S linker.sim.ld
+	$(GCC) $(CFLAGS_RV32) -Tlinker.sim.ld $< -nostdlib -static -o $@
 
 %.dump: %.elf
 	$(OBJDUMP) -d -S $< > $@
