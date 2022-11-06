@@ -77,9 +77,9 @@ trait VexRiscvCoreIODMemConnector {
   def connectDMem(out: AXI4Bundle): Unit
 }
 
-trait VexRiscvCoreIODMemPartConfig 
+trait VexRiscvCoreIODMemPartConfig
   extends Bundle
-  with VexRiscvCoreIODMemConnector {
+    with VexRiscvCoreIODMemConnector {
   val dBus_arw_valid = Output(Bool())
   val dBus_arw_ready = Input(Bool())
   val dBus_arw_payload_addr = Output(UInt((31 + 1).W))
@@ -181,7 +181,7 @@ trait VexRiscvCoreIODMemPartConfig
 
 trait VexRiscvCoreIODMemFullConfig
   extends Bundle
-  with VexRiscvCoreIODMemConnector {
+    with VexRiscvCoreIODMemConnector {
   // Data Memory Interface
   val dBus_aw_valid = Output(Bool())
   val dBus_aw_ready = Input(Bool())
@@ -263,6 +263,7 @@ trait VexRiscvCoreIODMemFullConfig
   //   input      [1:0]    dBus_r_payload_resp,
   //   input               dBus_r_payload_last,
   override def connectDMem(out: AXI4Bundle) = {
+    val disableCaching = false
     dBus_aw_ready := out.aw.ready
     out.aw.valid := dBus_aw_valid
     out.aw.bits.id := 0.U
@@ -271,7 +272,7 @@ trait VexRiscvCoreIODMemFullConfig
     out.aw.bits.size := dBus_aw_payload_size
     out.aw.bits.burst := dBus_aw_payload_burst
     out.aw.bits.lock := dBus_aw_payload_lock
-    out.aw.bits.cache := dBus_aw_payload_cache & 0.U
+    out.aw.bits.cache := dBus_aw_payload_cache & (if (disableCaching) 0xffff.U else 0.U)
     out.aw.bits.prot := dBus_aw_payload_prot
     out.aw.bits.qos := dBus_aw_payload_qos
 
@@ -293,7 +294,7 @@ trait VexRiscvCoreIODMemFullConfig
     out.ar.bits.size := dBus_ar_payload_size
     out.ar.bits.burst := dBus_ar_payload_burst
     out.ar.bits.lock := dBus_ar_payload_lock
-    out.ar.bits.cache := dBus_ar_payload_cache & 0.U
+    out.ar.bits.cache := dBus_ar_payload_cache & (if (disableCaching) 0xffff.U else 0.U)
     out.ar.bits.prot := dBus_ar_payload_prot
     out.ar.bits.qos := dBus_ar_payload_qos
 
