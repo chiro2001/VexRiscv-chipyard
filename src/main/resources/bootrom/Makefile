@@ -20,7 +20,7 @@ elf: $(bootrom_elf)
 	$(OBJCOPY) -O binary --change-addresses=-0x10000 $< $@
 
 %.rv32.elf: %.S linker.ld
-	$(GCC) $(CFLAGS_RV32) -Tlinker.ld $< copy_flash.c -nostdlib -static -o $@
+	$(GCC) $(CFLAGS_RV32) -Tlinker.ld $< -nostdlib -static -o $@
 
 %.sim.rv32.elf: %.sim.S linker.sim.ld
 	$(GCC) $(CFLAGS_RV32) -Tlinker.sim.ld $< -nostdlib -static -o $@

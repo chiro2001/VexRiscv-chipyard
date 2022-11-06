@@ -53,18 +53,18 @@ wfi_loop: // wait for MSIP interrupt to start program execution
 
 _copy_flash:
 	// flash_addr
-	li a1, 0x20100000>>12
+	li a1, 0x20100000
 	// ddr_addr
-	li a2, 0x80000000>>12
+	li a2, 0x80000000
 	// program_size
 	# li a3, (15*0x400*0x400)
-	li a3, ((256 * 0x400) - 1) // set to 256kb
+	li a3, ((40 * 0x400) - 4) // set to 40kb
 _copy_flash_loop:
 	lw t0, 0(a1)
 	sw t0, 0(a2)
-	addi a1, a1, 1
-	addi a2, a2, 1
-	addi a3, a3, -1
+	addi a1, a1, 4
+	addi a2, a2, 4
+	addi a3, a3, -4
 	bnez a3, _copy_flash_loop
 	ret
 
@@ -98,7 +98,7 @@ start_copy:
 	sw a6,0(a0)
 
   li a0, BOOTADDR_REG
-  lw a1, 0(a0)
+  lw a0, 0(a0)
   csrw mepc, a0       // return from interrupt to start of user program
   csrr a0, mhartid    // hartid for next level bootloader
   la a1, _dtb         // dtb address for next level bootloader

@@ -94,7 +94,9 @@ object VexAxiJTAGCore {
           //     ioRange = _ (31 downto 28) === 0xF
           //   ) else
           new StaticMemoryTranslatorPlugin(
-            ioRange = _ (31 downto 24) === 0x54
+            // ioRange = _ (31 downto 24) === 0x54
+            // for Uart and SPIFlash
+            ioRange = addr => addr(31 downto 24) === 0x54 || addr(31 downto 24) === 0x20
             // ioRange = _ (31 downto 28) === 0xF
           ),
           new DecoderSimplePlugin(

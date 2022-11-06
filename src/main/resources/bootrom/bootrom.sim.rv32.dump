@@ -24,7 +24,7 @@ Disassembly of section .start:
    10040:	00e52023          	sw	a4,0(a0)
    10044:	00f52023          	sw	a5,0(a0)
    10048:	01052023          	sw	a6,0(a0)
-   1004c:	0980006f          	j	100e4 <start_copy>
+   1004c:	0940006f          	j	100e0 <start_copy>
 
 Disassembly of section .text.hang:
 
@@ -46,52 +46,48 @@ Disassembly of section .text.hang:
    100b0:	ffdff06f          	j	100ac <wfi_loop>
 
 000100b4 <_copy_flash>:
-   100b4:	000205b7          	lui	a1,0x20
-   100b8:	10058593          	addi	a1,a1,256 # 20100 <__bss_end+0xef80>
-   100bc:	00080637          	lui	a2,0x80
-   100c0:	000406b7          	lui	a3,0x40
-   100c4:	fff68693          	addi	a3,a3,-1 # 3ffff <__bss_end+0x2ee7f>
+   100b4:	201005b7          	lui	a1,0x20100
+   100b8:	80000637          	lui	a2,0x80000
+   100bc:	0000a6b7          	lui	a3,0xa
+   100c0:	ffc68693          	addi	a3,a3,-4 # 9ffc <__STACKSIZE__+0x8ffc>
 
-000100c8 <_copy_flash_loop>:
-   100c8:	0005a283          	lw	t0,0(a1)
-   100cc:	00562023          	sw	t0,0(a2) # 80000 <__bss_end+0x6ee80>
-   100d0:	00158593          	addi	a1,a1,1
-   100d4:	00160613          	addi	a2,a2,1
-   100d8:	fff68693          	addi	a3,a3,-1
-   100dc:	fe0696e3          	bnez	a3,100c8 <_copy_flash_loop>
-   100e0:	00008067          	ret
+000100c4 <_copy_flash_loop>:
+   100c4:	0005a283          	lw	t0,0(a1) # 20100000 <__bss_end+0x200eee80>
+   100c8:	00562023          	sw	t0,0(a2) # 80000000 <__bss_end+0x7ffeee80>
+   100cc:	00458593          	addi	a1,a1,4
+   100d0:	00460613          	addi	a2,a2,4
+   100d4:	ffc68693          	addi	a3,a3,-4
+   100d8:	fe0696e3          	bnez	a3,100c4 <_copy_flash_loop>
+   100dc:	00008067          	ret
 
-000100e4 <start_copy>:
-   100e4:	fd1ff0ef          	jal	ra,100b4 <_copy_flash>
-   100e8:	54000537          	lui	a0,0x54000
-   100ec:	00000593          	li	a1,0
-   100f0:	00b52823          	sw	a1,16(a0) # 54000010 <__bss_end+0x53feee90>
-   100f4:	00100593          	li	a1,1
-   100f8:	00b52423          	sw	a1,8(a0)
-   100fc:	00100593          	li	a1,1
-   10100:	00b52623          	sw	a1,12(a0)
-   10104:	04300593          	li	a1,67
-   10108:	04f00613          	li	a2,79
-   1010c:	05000693          	li	a3,80
-   10110:	05900713          	li	a4,89
-   10114:	02e00793          	li	a5,46
-   10118:	00a00813          	li	a6,10
-   1011c:	00b52023          	sw	a1,0(a0)
-   10120:	00c52023          	sw	a2,0(a0)
-   10124:	00d52023          	sw	a3,0(a0)
-   10128:	00e52023          	sw	a4,0(a0)
-   1012c:	00f52023          	sw	a5,0(a0)
-   10130:	01052023          	sw	a6,0(a0)
-   10134:	00004537          	lui	a0,0x4
-   10138:	00052583          	lw	a1,0(a0) # 4000 <__STACKSIZE__+0x3000>
-   1013c:	34151073          	csrw	mepc,a0
-   10140:	f1402573          	csrr	a0,mhartid
-   10144:	00000597          	auipc	a1,0x0
-   10148:	01458593          	addi	a1,a1,20 # 10158 <_dtb>
-   1014c:	08000613          	li	a2,128
-   10150:	30063073          	csrc	mstatus,a2
-   10154:	30200073          	mret
-
-00010158 <_dtb>:
-   10158:	0000                	unimp
-	...
+000100e0 <start_copy>:
+   100e0:	fd5ff0ef          	jal	ra,100b4 <_copy_flash>
+   100e4:	54000537          	lui	a0,0x54000
+   100e8:	00000593          	li	a1,0
+   100ec:	00b52823          	sw	a1,16(a0) # 54000010 <__bss_end+0x53feee90>
+   100f0:	00100593          	li	a1,1
+   100f4:	00b52423          	sw	a1,8(a0)
+   100f8:	00100593          	li	a1,1
+   100fc:	00b52623          	sw	a1,12(a0)
+   10100:	04300593          	li	a1,67
+   10104:	04f00613          	li	a2,79
+   10108:	05000693          	li	a3,80
+   1010c:	05900713          	li	a4,89
+   10110:	02e00793          	li	a5,46
+   10114:	00a00813          	li	a6,10
+   10118:	00b52023          	sw	a1,0(a0)
+   1011c:	00c52023          	sw	a2,0(a0)
+   10120:	00d52023          	sw	a3,0(a0)
+   10124:	00e52023          	sw	a4,0(a0)
+   10128:	00f52023          	sw	a5,0(a0)
+   1012c:	01052023          	sw	a6,0(a0)
+   10130:	00004537          	lui	a0,0x4
+   10134:	00052503          	lw	a0,0(a0) # 4000 <__STACKSIZE__+0x3000>
+   10138:	34151073          	csrw	mepc,a0
+   1013c:	f1402573          	csrr	a0,mhartid
+   10140:	00000597          	auipc	a1,0x0
+   10144:	01858593          	addi	a1,a1,24 # 10158 <_dtb>
+   10148:	08000613          	li	a2,128
+   1014c:	30063073          	csrc	mstatus,a2
+   10150:	30200073          	mret
+   10154:	00000013          	nop
