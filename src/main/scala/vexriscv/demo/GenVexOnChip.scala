@@ -256,13 +256,14 @@ object VexOnChip {
       )
 
       axiCrossbar.addConnections(
+        iBus -> List(ram.getAXIPort, reqBus),
         dBus -> List(ram.getAXIPort, reqBus),
-        iBus -> List(ram.getAXIPort, reqBus)
       )
 
       axiCrossbar.addPipelining(ram.getAXIPort)((crossbar, ctrl) => {
         crossbar.sharedCmd.halfPipe() >> ctrl.sharedCmd
-        crossbar.writeData >/-> ctrl.writeData
+        // crossbar.writeData >/-> ctrl.writeData
+        crossbar.writeData >> ctrl.writeData
         crossbar.writeRsp << ctrl.writeRsp
         crossbar.readRsp << ctrl.readRsp
       })
@@ -274,12 +275,12 @@ object VexOnChip {
         crossbar.readRsp << ctrl.readRsp
       })
 
-      axiCrossbar.addPipelining(dBus)((cpu, crossbar) => {
-        cpu.sharedCmd >> crossbar.sharedCmd
-        cpu.writeData >> crossbar.writeData
-        cpu.writeRsp << crossbar.writeRsp
-        cpu.readRsp <-< crossbar.readRsp //Data cache directly use read responses without buffering, so pipeline it for FMax
-      })
+      // axiCrossbar.addPipelining(dBus)((cpu, crossbar) => {
+      //   cpu.sharedCmd >> crossbar.sharedCmd
+      //   cpu.writeData >> crossbar.writeData
+      //   cpu.writeRsp << crossbar.writeRsp
+      //   cpu.readRsp <-< crossbar.readRsp //Data cache directly use read responses without buffering, so pipeline it for FMax
+      // })
 
       axiCrossbar.build()
 
