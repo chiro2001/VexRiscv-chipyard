@@ -15,12 +15,11 @@ import chipsalliance.rocketchip.config.Parameters
 import chisel3._
 import chisel3.util._
 import freechips.rocketchip.amba.axi4.AXI4Bundle
-import spinal.core.SpinalConfig
-import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAxiJTAGConfig, VexAxiJTAGCore, VexInterfaceConfig, VexOnChip, VexOnChipConfig}
-// import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
-import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreUse}
+import vexriscv.chipyard.VexCoreBase.processFileContent
+import vexriscv.demo.{GenVexOnChip, VexAxiJTAGConfig, VexAxiJTAGCore}
 
-import scala.tools.nsc.io.File
+import java.io.{File, PrintWriter}
+import scala.io.Source
 
 trait VexRiscvCoreIOIRvfi extends Bundle {
   val rvfi_valid = Output(Bool())
@@ -350,9 +349,10 @@ abstract class VexCoreBase
 
   val chipyardDir = System.getProperty("user.dir")
   val vexRiscvVsrcDir = s"$chipyardDir"
-  val targetVerilogFile = s"$vexRiscvVsrcDir/$moduleName.v"
+  val sourceVerilogFile = s"$vexRiscvVsrcDir/$moduleName.v"
+  val targetVerilogFile = s"$vexRiscvVsrcDir/$moduleName.preprocessed.v"
 
-  val file = File(targetVerilogFile)
+  val file = new File(sourceVerilogFile)
   if (file.exists) {
     require(file.delete(), s"Waring: cannot delete file $file")
   }
@@ -370,6 +370,10 @@ abstract class VexCoreBase
       hartId = hartId
     ), name = moduleName)
   }
+  val writer = new PrintWriter(new File(targetVerilogFile))
+  val preprocessed = processFileContent(Source.fromFile(targetVerilogFile).getLines().mkString("\n"), hartId)
+  writer.write(preprocessed)
+  writer.close()
 
   addPath(targetVerilogFile)
 }
@@ -394,9 +398,35 @@ class VexCore(onChopRAM: Boolean, moduleName: String = "VexCore", hartId: Int = 
 
 class VexCore0(onChopRAM: Boolean, moduleName: String = "VexCore0")(implicit p: Parameters)
   extends VexAXICoreFull(onChopRAM, moduleName = moduleName, hartId = 0)
+
 class VexCore1(onChopRAM: Boolean, moduleName: String = "VexCore1")(implicit p: Parameters)
   extends VexAXICoreFull(onChopRAM, moduleName = moduleName, hartId = 1)
+
 class VexCore2(onChopRAM: Boolean, moduleName: String = "VexCore2")(implicit p: Parameters)
   extends VexAXICoreFull(onChopRAM, moduleName = moduleName, hartId = 2)
+
 class VexCore3(onChopRAM: Boolean, moduleName: String = "VexCore3")(implicit p: Parameters)
   extends VexAXICoreFull(onChopRAM, moduleName = moduleName, hartId = 3)
+
+object VexCoreBase {
+  def processFileContent(raw: String, id: Int): String = {
+    var content = raw
+    val modules = ("module +(\\w+)".r findAllIn content).map(str => str.slice("module ".length, str.length)).toList
+    println(s"preprocessed modules: ${modules}")
+    for (module <- modules) {
+      if (!module.endsWith(s"${id}"))
+        content = content.replaceAll(module, s"${module}${id}")
+    }
+    content
+  }
+
+  def main(args: Array[String]): Unit = {
+    // println(processFileContent(Source.fromFile("VexCore0.v").getLines().mkString("\n"), 0))
+    val sourceVerilogFile = "VexCore0.v"
+    val targetVerilogFile = "VexCore0.preprocessed.v"
+    val writer = new PrintWriter(new File(targetVerilogFile))
+    val preprocessed = processFileContent(Source.fromFile(sourceVerilogFile).getLines().mkString("\n"), 0)
+    writer.write(preprocessed)
+    writer.close()
+  }
+}
