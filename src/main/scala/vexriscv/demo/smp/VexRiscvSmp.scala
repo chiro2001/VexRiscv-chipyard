@@ -139,7 +139,8 @@ class VexRiscvSmp(p: VexRiscvSmpParameter, enableDebug: Boolean = false)
   val softwareInterrupt = in UInt (p.cpuConfigs.size bits)
   val externalInterrupt = in UInt (p.cpuConfigs.size bits)
   val externalSupervisorInterrupt = in UInt (p.cpuConfigs.size bits)
-  val utime = Seq.fill(p.cpuConfigs.size)(in UInt (64 bits))
+  val utime = in UInt ((64 * p.cpuConfigs.size) bits)
+
 
   for ((core, cpuId) <- cores.zipWithIndex) {
     core.cpu.setTimerInterrupt(timerInterrupt(cpuId))
@@ -149,7 +150,7 @@ class VexRiscvSmp(p: VexRiscvSmpParameter, enableDebug: Boolean = false)
       core.cpu.externalSupervisorInterrupt := externalInterrupt(cpuId)
       for (plugin <- core.cpu.config.plugins) plugin match {
         case plugin: CsrPlugin =>
-          if (plugin.utime != null) plugin.utime := utime(cpuId)
+          if (plugin.utime != null) plugin.utime := utime(((cpuId + 1) * 64 - 1) downto (cpuId * 64))
           else println(s"null utime code id $cpuId")
         case _ =>
       }
@@ -352,23 +353,7 @@ object VexRiscvSmpGen {
     config
   }
 
-
-  // def vexRiscvCluster(cpuCount: Int, resetVector: Long = 0x80000000l) = new VexRiscvSmp(
-  //   // debugClockDomain = ClockDomain.current.copy(reset = Bool().setName("debugResetIn")),
-  //   p = VexRiscvSmpParameter(
-  //     cpuConfigs = List.tabulate(cpuCount) {
-  //       vexRiscvConfig(_, resetVector = resetVector)
-  //     }
-  //   )
-  // )
-  //
-  // def main(args: Array[String]): Unit = {
-  //   SpinalVerilog {
-  //     vexRiscvCluster(4)
-  //   }
-  // }
-
-  def main(args: Array[String]): Unit = {
+  def run(): Unit = {
     def dutGen = {
       val cpuCount = 2
       val enableDebug = false
@@ -395,6 +380,11 @@ object VexRiscvSmpGen {
       }
       new VexCoreSmp
     }
+
     SpinalConfig().generateVerilog(dutGen)
+  }
+
+  def main(args: Array[String]): Unit = {
+    run()
   }
 }
