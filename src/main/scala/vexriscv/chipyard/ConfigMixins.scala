@@ -28,7 +28,7 @@ class WithNVexRiscvCores(n: Int = 1, overrideIdOffset: Option[Int] = None, onChi
     (0 until n).map { i =>
       // println(s"VexRiscvCore #$i, onChipRAM=$onChipRAM, resetVector=${site(VexRiscvConfigKey).resetVector}")
       VexRiscvTileAttachParams(
-        tileParams = VexRiscvTileParams(hartId = i + idOffset, trace = true, onChipRAM = onChipRAM),
+        tileParams = VexRiscvTileParams(hartId = i + idOffset, onChipRAM = onChipRAM),
         crossingParams = RocketCrossingParams()
       )
     } ++ prev

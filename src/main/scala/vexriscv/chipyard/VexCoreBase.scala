@@ -342,7 +342,8 @@ class VexRiscvCoreIOPartAXI extends Bundle
   with VexRiscvCoreIOIMem
   with VexRiscvCoreIOBasic
 
-abstract class VexCoreBase(onChipRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
+abstract class VexCoreBase
+(onChipRAM: Boolean, moduleName: String = "VexCore", hartId: Int = 0)(implicit p: Parameters)
   extends BlackBox
     with HasBlackBoxPath {
   val io: VexRiscvCoreIOBasic with VexRiscvCoreIODMemConnector
@@ -356,8 +357,8 @@ abstract class VexCoreBase(onChipRAM: Boolean, moduleName: String = "VexCore")(i
     require(file.delete(), s"Waring: cannot delete file $file")
   }
 
-  val config = p(VexRiscvConfigKey)
-  println(s"VexCore OnChip generate with Config: ${config}")
+  val config = p(VexRiscvConfigKey).copy(hartId = hartId)
+  println(s"VexCore generate with Config: ${config}")
   if (onChipRAM) {
     GenVexOnChip.run(config, name = moduleName)
   } else {
@@ -365,8 +366,9 @@ abstract class VexCoreBase(onChipRAM: Boolean, moduleName: String = "VexCore")(i
       iCacheSize = config.iCacheSize,
       dCacheSize = config.dCacheSize,
       hardwareBreakpointCount = config.hardwareBreakpointCount,
-      resetVector = config.resetVector
-    ))
+      resetVector = config.resetVector,
+      hartId = hartId
+    ), name = moduleName)
   }
 
   addPath(targetVerilogFile)
@@ -377,8 +379,8 @@ class VexAXICorePart(onChopRAM: Boolean, moduleName: String = "VexCore")(implici
   override val io = IO(new VexRiscvCoreIOPartAXI)
 }
 
-class VexAXICoreFull(onChopRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
-  extends VexCoreBase(onChopRAM, moduleName = moduleName) {
+class VexAXICoreFull(onChopRAM: Boolean, moduleName: String = "VexCore", hartId: Int = 0)(implicit p: Parameters)
+  extends VexCoreBase(onChopRAM, moduleName = moduleName, hartId = hartId) {
   override val io = IO(new VexRiscvCoreIOFullAXI with VexRiscvCoreIOIMem)
 }
 
@@ -387,5 +389,14 @@ class VexAXICoreFullDBusOnly(onChopRAM: Boolean, moduleName: String = "VexAXICor
   override val io = IO(new VexRiscvCoreIOFullAXI)
 }
 
-class VexCore(onChopRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
-  extends VexAXICoreFull(onChopRAM, moduleName = moduleName)
+class VexCore(onChopRAM: Boolean, moduleName: String = "VexCore", hartId: Int = 0)(implicit p: Parameters)
+  extends VexAXICoreFull(onChopRAM, moduleName = moduleName, hartId = hartId)
+
+class VexCore0(onChopRAM: Boolean, moduleName: String = "VexCore0")(implicit p: Parameters)
+  extends VexAXICoreFull(onChopRAM, moduleName = moduleName, hartId = 0)
+class VexCore1(onChopRAM: Boolean, moduleName: String = "VexCore1")(implicit p: Parameters)
+  extends VexAXICoreFull(onChopRAM, moduleName = moduleName, hartId = 1)
+class VexCore2(onChopRAM: Boolean, moduleName: String = "VexCore2")(implicit p: Parameters)
+  extends VexAXICoreFull(onChopRAM, moduleName = moduleName, hartId = 2)
+class VexCore3(onChopRAM: Boolean, moduleName: String = "VexCore3")(implicit p: Parameters)
+  extends VexAXICoreFull(onChopRAM, moduleName = moduleName, hartId = 3)

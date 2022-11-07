@@ -11,7 +11,8 @@ import vexriscv.plugin._
 import vexriscv.{VexRiscv, VexRiscvConfig, plugin}
 
 case class VexAxiJTAGConfig
-(iCacheSize: Int = 4096,
+(hartId: Int = 0,
+ iCacheSize: Int = 4096,
  dCacheSize: Int = 4096,
  hardwareBreakpointCount: Int = 3,
  resetVector: BigInt = vexriscv.demo.VexInterfaceConfig.resetVector)
@@ -21,7 +22,7 @@ object VexAxiJTAGConfig {
 }
 
 object VexAxiJTAGCore {
-  def run(config: VexAxiJTAGConfig): Unit = {
+  def run(config: VexAxiJTAGConfig, name: String = "VexCore"): Unit = {
     import config._
     println(s"GenAxiJTAG with config: ${config}")
     val report = SpinalVerilog {
@@ -143,7 +144,7 @@ object VexAxiJTAGCore {
               mvendorid = 1,
               marchid = 2,
               mimpid = 3,
-              mhartid = 0,
+              mhartid = hartId,
               misaExtensionsInit = 0, // raw is 66
               misaAccess = CsrAccess.READ_WRITE,
               mtvecAccess = CsrAccess.READ_WRITE,
@@ -239,7 +240,7 @@ object VexAxiJTAGCore {
           case _ =>
         }
       }
-      cpu.setDefinitionName("VexCore")
+      cpu.setDefinitionName(name)
     }
   }
 }

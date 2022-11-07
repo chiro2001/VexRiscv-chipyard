@@ -13,7 +13,8 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 
 case class VexOnChipConfig
-(iCacheSize: Int = 4 * 1024,
+(hartId: Int = 0,
+ iCacheSize: Int = 4 * 1024,
  dCacheSize: Int = 4096, // not used here but there
  onChipRamSize: BigInt = 32 KiB,
  onChipRamBinaryFile: String = null,
@@ -35,49 +36,6 @@ object VexOnChipConfig {
       catchAccessFault = false,
       earlyInjection = false,
       bigEndian = bigEndian
-    ),
-    // new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
-    // new CsrPlugin(CsrPluginConfig.linuxFull(0x80000020L)),
-    new CsrPlugin(
-      config = CsrPluginConfig(
-        catchIllegalAccess = true,
-        mvendorid = 1,
-        marchid = 2,
-        mimpid = 3,
-        mhartid = 0,
-        misaExtensionsInit = 0, // raw is 66
-        misaAccess = CsrAccess.READ_WRITE,
-        mtvecAccess = CsrAccess.READ_WRITE,
-        mtvecInit = 0x80000080L,
-        mepcAccess = CsrAccess.READ_WRITE,
-        mscratchGen = true,
-        mcauseAccess = CsrAccess.READ_WRITE,
-        mbadaddrAccess = CsrAccess.READ_WRITE,
-        mcycleAccess = CsrAccess.READ_WRITE,
-        minstretAccess = CsrAccess.READ_WRITE,
-        ucycleAccess = CsrAccess.READ_ONLY,
-        uinstretAccess = CsrAccess.READ_ONLY,
-        wfiGenAsWait = true,
-        ecallGen = true,
-        xtvecModeGen = false,
-        noCsrAlu = false,
-        wfiGenAsNop = false,
-        ebreakGen = false,
-        userGen = true,
-        supervisorGen = false,
-        sscratchGen = true,
-        stvecAccess = CsrAccess.READ_WRITE,
-        sepcAccess = CsrAccess.READ_WRITE,
-        scauseAccess = CsrAccess.READ_WRITE,
-        sbadaddrAccess = CsrAccess.READ_WRITE,
-        scycleAccess = CsrAccess.READ_WRITE,
-        sinstretAccess = CsrAccess.READ_WRITE,
-        satpAccess = CsrAccess.NONE, //Implemented into the MMU plugin
-        medelegAccess = CsrAccess.READ_WRITE,
-        midelegAccess = CsrAccess.READ_WRITE,
-        pipelineCsrRead = false,
-        deterministicInteruptionEntry = false
-      )
     ),
     new StaticMemoryTranslatorPlugin(
       ioRange = addr => addr(31 downto 28) =/= 0x8 && addr(31 downto 16) =/= 0x0001
@@ -138,7 +96,54 @@ object VexOnChip {
   def apply(config: VexOnChipConfig): VexRiscv = {
     import config._
 
-    val plugins = cpuPlugins += new DebugPlugin(ClockDomain.current.copy(reset = Bool().setName("debugReset")))
+    val plugins = cpuPlugins
+    if (!plugins.exists(_.isInstanceOf[CsrPlugin]))
+      plugins += // new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
+        // new CsrPlugin(CsrPluginConfig.linuxFull(0x80000020L)),
+        new CsrPlugin(
+          config = CsrPluginConfig(
+            catchIllegalAccess = true,
+            mvendorid = 1,
+            marchid = 2,
+            mimpid = 3,
+            mhartid = hartId,
+            misaExtensionsInit = 0, // raw is 66
+            misaAccess = CsrAccess.READ_WRITE,
+            mtvecAccess = CsrAccess.READ_WRITE,
+            mtvecInit = 0x80000080L,
+            mepcAccess = CsrAccess.READ_WRITE,
+            mscratchGen = true,
+            mcauseAccess = CsrAccess.READ_WRITE,
+            mbadaddrAccess = CsrAccess.READ_WRITE,
+            mcycleAccess = CsrAccess.READ_WRITE,
+            minstretAccess = CsrAccess.READ_WRITE,
+            ucycleAccess = CsrAccess.READ_ONLY,
+            uinstretAccess = CsrAccess.READ_ONLY,
+            wfiGenAsWait = true,
+            ecallGen = true,
+            xtvecModeGen = false,
+            noCsrAlu = false,
+            wfiGenAsNop = false,
+            ebreakGen = false,
+            userGen = true,
+            supervisorGen = false,
+            sscratchGen = true,
+            stvecAccess = CsrAccess.READ_WRITE,
+            sepcAccess = CsrAccess.READ_WRITE,
+            scauseAccess = CsrAccess.READ_WRITE,
+            sbadaddrAccess = CsrAccess.READ_WRITE,
+            scycleAccess = CsrAccess.READ_WRITE,
+            sinstretAccess = CsrAccess.READ_WRITE,
+            satpAccess = CsrAccess.NONE, //Implemented into the MMU plugin
+            medelegAccess = CsrAccess.READ_WRITE,
+            midelegAccess = CsrAccess.READ_WRITE,
+            pipelineCsrRead = false,
+            deterministicInteruptionEntry = false
+          )
+        )
+    if (!plugins.exists(_.isInstanceOf[DebugPlugin]))
+      plugins += new DebugPlugin(ClockDomain.current.copy(reset = Bool().setName("debugReset")))
+
 
     // Instantiate the CPU
     val cpu = new VexRiscv(

@@ -3,6 +3,8 @@
 .section .start, "ax", @progbits
 .global _start
 _start:
+	csrr a0, mhartid                  # read current hart id
+  bnez a0, park                     # if we're not on the hart 0
   // for sifive uart
   li a0,0x54000000
 	// disable interrupts
@@ -116,3 +118,7 @@ start_copy:
 
 .align 3
 _dtb:
+
+park:
+	wfi
+	j park

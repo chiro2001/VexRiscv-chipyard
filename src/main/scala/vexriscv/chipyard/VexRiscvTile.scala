@@ -78,7 +78,7 @@ case class VexRiscvTileAttachParams
 case class VexRiscvTileParams
 (name: Option[String] = Some("vexRiscv_tile"),
  hartId: Int = 0,
- trace: Boolean = false,
+ trace: Boolean = true,
  onChipRAM: Boolean = false,
  core: VexRiscvCoreParams = VexRiscvCoreParams()
 ) extends InstantiableTileParams[VexRiscvTile] {
@@ -274,13 +274,19 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
 
   // connect the vexRiscv core
   val onChipRAM = outer.vexRiscvParams.onChipRAM
-  // val onChipRAM = outer.memAXI4Nodes.size == 1
-  println(s"onChipRAM = ${onChipRAM}")
+  println(s"onChipRAM = ${onChipRAM}, hartId = ${outer.vexRiscvParams.hartId}")
   val core: VexCoreBase =
     if (!onChipRAM) {
-      import vexriscv.chipyard.VexCore
-      Module(new VexCore(outer.vexRiscvParams.onChipRAM))
-        .suggestName("vexRiscv_core_inst")
+      import vexriscv.chipyard._
+      val moduleSeq = Seq(
+        () => new VexCore0(outer.vexRiscvParams.onChipRAM),
+        () => new VexCore1(outer.vexRiscvParams.onChipRAM),
+        () => new VexCore2(outer.vexRiscvParams.onChipRAM),
+        () => new VexCore3(outer.vexRiscvParams.onChipRAM),
+      )
+      require(outer.vexRiscvParams.hartId < 4)
+      Module(moduleSeq(outer.vexRiscvParams.hartId)())
+        .suggestName("vexRiscv_core_" + outer.vexRiscvParams.hartId)
     } else {
       import vexriscv.chipyard.VexAXICoreFullDBusOnly
       Module(new VexAXICoreFullDBusOnly(outer.vexRiscvParams.onChipRAM))
@@ -303,16 +309,14 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
 
     // TODO: add tracer
     for (w <- 0 until outer.vexRiscvParams.core.retireWidth) {
-      // outer.traceSourceNode.bundle(w).valid := core.io.io_rvfi_valid
-      // outer.traceSourceNode.bundle(w).iaddr := core.io.io_rvfi_pc_rdata
-      // outer.traceSourceNode.bundle(w).insn := core.io.io_rvfi_insn
-      // outer.traceSourceNode.bundle(w).priv := 3.U
-      // outer.traceSourceNode.bundle(w).exception := false.B
-      // outer.traceSourceNode.bundle(w).interrupt := core.io.io_rvfi_intr
-      // outer.traceSourceNode.bundle(w).cause := 0.U
-      // outer.traceSourceNode.bundle(w).tval := 0.U
-      outer.traceSourceNode.bundle := DontCare
-      outer.traceSourceNode.bundle foreach (t => t.valid := false.B)
+      outer.traceSourceNode.bundle(w).valid := core.io.rvfi_valid
+      outer.traceSourceNode.bundle(w).iaddr := core.io.rvfi_pc_rdata
+      outer.traceSourceNode.bundle(w).insn := core.io.rvfi_insn
+      outer.traceSourceNode.bundle(w).priv := 3.U
+      outer.traceSourceNode.bundle(w).exception := false.B
+      outer.traceSourceNode.bundle(w).interrupt := core.io.rvfi_intr
+      outer.traceSourceNode.bundle(w).cause := 0.U
+      outer.traceSourceNode.bundle(w).tval := core.io.rvfi_order
     }
   } else {
     outer.traceSourceNode.bundle := DontCare
