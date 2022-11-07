@@ -330,7 +330,6 @@ trait VexRiscvCoreIOBase extends Bundle {
 trait VexRiscvCoreIOBasic extends Bundle
   with VexRiscvCoreIOBase
   with VexRiscvCoreIOIRQ
-  with VexRiscvCoreIOIMem
   with VexRiscvCoreIOIRvfi
   with VexRiscvCoreIOJtag
 
@@ -340,6 +339,7 @@ class VexRiscvCoreIOFullAXI extends Bundle
 
 class VexRiscvCoreIOPartAXI extends Bundle
   with VexRiscvCoreIODMemPartConfig
+  with VexRiscvCoreIOIMem
   with VexRiscvCoreIOBasic
 
 abstract class VexCoreBase(onChipRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
@@ -372,12 +372,20 @@ abstract class VexCoreBase(onChipRAM: Boolean, moduleName: String = "VexCore")(i
   addPath(targetVerilogFile)
 }
 
-class VexAXICorePart(onChopRAM: Boolean)(implicit p: Parameters) extends VexCoreBase(onChopRAM) {
+class VexAXICorePart(onChopRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
+  extends VexCoreBase(onChopRAM, moduleName = moduleName) {
   override val io = IO(new VexRiscvCoreIOPartAXI)
 }
 
-class VexAXICoreFull(onChopRAM: Boolean)(implicit p: Parameters) extends VexCoreBase(onChopRAM) {
+class VexAXICoreFull(onChopRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
+  extends VexCoreBase(onChopRAM, moduleName = moduleName) {
+  override val io = IO(new VexRiscvCoreIOFullAXI with VexRiscvCoreIOIMem)
+}
+
+class VexAXICoreFullDBusOnly(onChopRAM: Boolean, moduleName: String = "VexAXICoreFullDBusOnly")(implicit p: Parameters)
+  extends VexCoreBase(onChopRAM, moduleName = moduleName) {
   override val io = IO(new VexRiscvCoreIOFullAXI)
 }
 
-class VexCore(onChopRAM: Boolean)(implicit p: Parameters) extends VexAXICoreFull(onChopRAM)
+class VexCore(onChopRAM: Boolean, moduleName: String = "VexCore")(implicit p: Parameters)
+  extends VexAXICoreFull(onChopRAM, moduleName = moduleName)

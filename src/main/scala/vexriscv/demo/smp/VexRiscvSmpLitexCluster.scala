@@ -104,7 +104,7 @@ class VexRiscvLitexSmpCluster(p : VexRiscvLitexSmpClusterParameter) extends VexR
 
 
 object VexRiscvLitexSmpClusterCmdGen extends App {
-  var cpuCount = 1
+  var cpuCount = 2
   var iBusWidth = 64
   var dBusWidth = 64
   var iCacheSize = 8192

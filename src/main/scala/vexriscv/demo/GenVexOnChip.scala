@@ -1,7 +1,7 @@
 package vexriscv.demo
 
 import spinal.core._
-import spinal.lib.bus.amba4.axi.{Axi4CrossbarFactory, Axi4ReadOnly, Axi4Shared, Axi4SharedOnChipRam}
+import spinal.lib.bus.amba4.axi.{Axi4Config, Axi4CrossbarFactory, Axi4ReadOnly, Axi4Shared, Axi4SharedOnChipRam}
 import spinal.lib.com.jtag.Jtag
 import spinal.lib.eda.altera.{InterruptReceiverTag, ResetEmitterTag}
 import spinal.lib.{master, slave}
@@ -38,6 +38,13 @@ object VexOnChipConfig {
     ),
     // new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
     new CsrPlugin(CsrPluginConfig.linuxFull(0x80000020L)),
+    new StaticMemoryTranslatorPlugin(
+      // ioRange = _ (31 downto 24) === 0x54
+      // for Uart and SPIFlash
+      // ioRange = addr => addr(31 downto 24) === 0x54 || addr(31 downto 24) === 0x20
+      // except ram
+      ioRange = _ (31 downto 28) =/= 0x8
+    ),
     new DecoderSimplePlugin(
       catchIllegalInstruction = false
     ),
@@ -64,7 +71,8 @@ object VexOnChipConfig {
       earlyBranch = false,
       catchAddressMisaligned = false
     ),
-    new YamlPlugin("cpu0.yaml")
+    new YamlPlugin("cpu0.yaml"),
+    new SimpleFormalPlugin
   )
 
   def default: VexOnChipConfig = default()
@@ -136,21 +144,21 @@ object VexOnChip {
       for (plugin <- cpu.plugins) plugin match {
         case plugin: IBusSimplePlugin =>
           plugin.iBus.setAsDirectionLess() //Unset IO properties of iBus
-          iBus = master(plugin.iBus.toAxi4ReadOnly().toFullConfig())
+          iBus = plugin.iBus.toAxi4ReadOnly()
             .setName("iBus")
             .addTag(ClockDomainTag(ClockDomain.current)) //Specify a clock domain to the iBus (used by QSysify)
         case plugin: IBusCachedPlugin =>
           plugin.iBus.setAsDirectionLess() //Unset IO properties of iBus
-          iBus = master(plugin.iBus.toAxi4ReadOnly().toFullConfig())
+          iBus = plugin.iBus.toAxi4ReadOnly()
             .setName("iBus")
             .addTag(ClockDomainTag(ClockDomain.current)) //Specify a clock domain to the iBus (used by QSysify)
         case plugin: DBusSimplePlugin =>
           plugin.dBus.setAsDirectionLess()
-          dBus = plugin.dBus.toAxi4Shared().toFullConfig()
+          dBus = plugin.dBus.toAxi4Shared()
             .addTag(ClockDomainTag(ClockDomain.current))
         case plugin: DBusCachedPlugin =>
           plugin.dBus.setAsDirectionLess()
-          dBus = plugin.dBus.toAxi4Shared(stageCmd = true).toFullConfig()
+          dBus = plugin.dBus.toAxi4Shared(stageCmd = true)
             .addTag(ClockDomainTag(ClockDomain.current))
         case plugin: DebugPlugin => plugin.debugClockDomain {
           plugin.io.bus.setAsDirectionLess()
@@ -170,10 +178,23 @@ object VexOnChip {
           plugin.timerInterrupt
             .addTag(InterruptReceiverTag(iBus, ClockDomain.current))
         }
+        case plugin: SimpleFormalPlugin => {
+          println("Enabled SimpleFormalPlugin")
+          master(plugin.rvfi).setName("rvfi")
+        }
         case _ =>
       }
 
-      val reqBus = dBus.copy()
+      val reqBus = Axi4Shared(Axi4Config(
+        addressWidth = 32,
+        dataWidth = 32,
+        idWidth = 4,
+        useLock = false,
+        useRegion = false,
+        useCache = false,
+        useProt = false,
+        useQos = false
+      ))
 
       val ram: Axi4SharedOnChipRamWithAXIPort = (if (!replaceMemoryIP)
         new Axi4SharedOnChipRamMem(
@@ -193,12 +214,12 @@ object VexOnChip {
 
       axiCrossbar.addSlaves(
         ram.getAXIPort -> (0x80000000L, onChipRamSize),
-        // reqBus -> (0x00000000L, BigInt(0x80000000L))
-        reqBus -> (0x00000000L, BigInt(0x70000000L))
+        reqBus -> (0x00000000L, BigInt(0x80000000L))
       )
 
       axiCrossbar.addConnections(
-        dBus -> List(ram.getAXIPort, reqBus)
+        dBus -> List(ram.getAXIPort, reqBus),
+        iBus -> List(ram.getAXIPort, reqBus)
       )
 
       axiCrossbar.addPipelining(ram.getAXIPort)((crossbar, ctrl) => {
@@ -224,7 +245,7 @@ object VexOnChip {
 
       axiCrossbar.build()
 
-      val reqBusFull = master(reqBus.toAxi4().setName("dBus"))
+      val reqBusFull = master(reqBus.toAxi4().toFullConfig().setName("dBus"))
     }
     cpu
   }

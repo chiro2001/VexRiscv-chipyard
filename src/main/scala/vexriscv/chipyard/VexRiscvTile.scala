@@ -23,7 +23,6 @@ import freechips.rocketchip.subsystem._
 import freechips.rocketchip.tile._
 import freechips.rocketchip.tilelink._
 import freechips.rocketchip.util._
-import vexriscv.chipyard.{VexCore => VexCoreUse}
 
 case class VexRiscvCoreParams
 (bootFreqHz: BigInt = BigInt(1700000000))
@@ -80,8 +79,8 @@ case class VexRiscvTileParams
 (name: Option[String] = Some("vexRiscv_tile"),
  hartId: Int = 0,
  trace: Boolean = false,
- val onChipRAM: Boolean = false,
- val core: VexRiscvCoreParams = VexRiscvCoreParams()
+ onChipRAM: Boolean = false,
+ core: VexRiscvCoreParams = VexRiscvCoreParams()
 ) extends InstantiableTileParams[VexRiscvTile] {
   val beuAddr: Option[BigInt] = None
   val blockerCtrlAddr: Option[BigInt] = None
@@ -160,12 +159,15 @@ class VexRiscvTile private
   val beatBytes = masterPortBeatBytes
   val sourceBits = 1 // equiv. to userBits (i think)
 
-  val memAXI4Nodes = Seq(
+  println(s"vexRiscvParams.onChipRAM = ${vexRiscvParams.onChipRAM}")
+
+  val memAXI4Nodes = if (!vexRiscvParams.onChipRAM) Seq(
     AXI4MasterNode(Seq(AXI4MasterPortParameters(
       masters = Seq(AXI4MasterParameters(portName + "-imem"))))),
     AXI4MasterNode(Seq(AXI4MasterPortParameters(
       masters = Seq(AXI4MasterParameters(portName + "-dmem")))))
-  )
+  ) else Seq(AXI4MasterNode(Seq(AXI4MasterPortParameters(
+    masters = Seq(AXI4MasterParameters(portName + "-dmem"))))))
   // val memAXI4Node =
   // AXI4MasterNode(Seq(
   //   AXI4MasterPortParameters(masters = Seq(AXI4MasterParameters(portName + "-imem"))),
@@ -173,29 +175,45 @@ class VexRiscvTile private
 
   val memoryTap = TLIdentityNode()
 
-  val useTLXBar = false
-  // val useTLXBar = true
+  if (memAXI4Nodes.size > 1) {
+    val useTLXBar = false
+    // val useTLXBar = true
 
-  if (useTLXBar) {
-    val xbar = TLXbar()
-    (tlMasterXbar.node
-      := memoryTap
-      := TLBuffer()
-      := xbar)
-    (xbar := TLBuffer() := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
-      := TLWidthWidget(beatBytes) // reduce size of TL
-      := AXI4ToTL() // convert to TL
-      := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
-      := AXI4Fragmenter() // deal with multi-beat xacts
-      := memAXI4Nodes.head)
-    (xbar := TLBuffer() := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
-      := TLWidthWidget(beatBytes) // reduce size of TL
-      := AXI4ToTL() // convert to TL
-      := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
-      := AXI4Fragmenter() // deal with multi-beat xacts
-      := memAXI4Nodes(1))
+    if (useTLXBar) {
+      val xbar = TLXbar()
+      (tlMasterXbar.node
+        := memoryTap
+        := TLBuffer()
+        := xbar)
+      (xbar := TLBuffer() := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
+        := TLWidthWidget(beatBytes) // reduce size of TL
+        := AXI4ToTL() // convert to TL
+        := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
+        := AXI4Fragmenter() // deal with multi-beat xacts
+        := memAXI4Nodes.head)
+      (xbar := TLBuffer() := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
+        := TLWidthWidget(beatBytes) // reduce size of TL
+        := AXI4ToTL() // convert to TL
+        := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
+        := AXI4Fragmenter() // deal with multi-beat xacts
+        := memAXI4Nodes(1))
+    } else {
+      val xbar = AXI4Xbar()
+      (tlMasterXbar.node
+        := memoryTap
+        := TLBuffer()
+        := TLFIFOFixer(TLFIFOFixer.all) // fix FIFO ordering
+        := TLWidthWidget(beatBytes) // reduce size of TL
+        := AXI4ToTL() // convert to TL
+        := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
+        := AXI4Fragmenter() // deal with multi-beat xacts
+        := xbar)
+      // xbar := AXI4UserYanker(Some(2)) := AXI4Fragmenter() := memAXI4Nodes.head
+      // xbar := AXI4UserYanker(Some(2)) := AXI4Fragmenter() := memAXI4Nodes(1)
+      xbar := memAXI4Nodes.head
+      xbar := memAXI4Nodes(1)
+    }
   } else {
-    val xbar = AXI4Xbar()
     (tlMasterXbar.node
       := memoryTap
       := TLBuffer()
@@ -204,11 +222,7 @@ class VexRiscvTile private
       := AXI4ToTL() // convert to TL
       := AXI4UserYanker(Some(2)) // remove user field on AXI interface. need but in reality user intf. not needed
       := AXI4Fragmenter() // deal with multi-beat xacts
-      := xbar)
-    // xbar := AXI4UserYanker(Some(2)) := AXI4Fragmenter() := memAXI4Nodes.head
-    // xbar := AXI4UserYanker(Some(2)) := AXI4Fragmenter() := memAXI4Nodes(1)
-    xbar := memAXI4Nodes.head
-    xbar := memAXI4Nodes(1)
+      := memAXI4Nodes.head)
   }
 
   def connectVexRiscvInterrupts(msip: Bool, mtip: Bool, meip: Bool): Unit = {
@@ -259,8 +273,20 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   val traceInstSz = (new freechips.rocketchip.rocket.TracedInstruction).getWidth + 2
 
   // connect the vexRiscv core
-  val core: VexCoreBase = Module(new VexCoreUse(outer.vexRiscvParams.onChipRAM))
-    .suggestName("vexRiscv_core_inst")
+  val onChipRAM = outer.vexRiscvParams.onChipRAM
+  // val onChipRAM = outer.memAXI4Nodes.size == 1
+  println(s"onChipRAM = ${onChipRAM}")
+  val core: VexCoreBase =
+    if (!onChipRAM) {
+      import vexriscv.chipyard.VexCore
+      Module(new VexCore(outer.vexRiscvParams.onChipRAM))
+        .suggestName("vexRiscv_core_inst")
+    } else {
+      import vexriscv.chipyard.VexAXICoreFullDBusOnly
+      Module(new VexAXICoreFullDBusOnly(outer.vexRiscvParams.onChipRAM))
+        .suggestName("vexRiscv_core_inst")
+    }
+  println(s"core: $core")
 
   core.io.clk := clock
   core.io.reset := reset.asBool
@@ -294,34 +320,84 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   }
 
   // connect the axi interface
-  // require(outer.memAXI4Nodes.out.size == 2, "This core requires imem and dmem AXI ports!")
-  require(outer.memAXI4Nodes.size == 2, "This core requires imem and dmem AXI ports!")
-  outer.memAXI4Nodes(1).out.head match {
-    case (out, edgeOut) =>
-      core.io.connectDMem(out)
-  }
-  outer.memAXI4Nodes.head.out.head match {
-    case (out, edgeOut) =>
-      out.aw := DontCare
-      out.w := DontCare
-      out.b := DontCare
+  if (core.io.isInstanceOf[VexRiscvCoreIOIMem]) {
+    core.io match {
+      case io: VexRiscvCoreIOFullAXI with VexRiscvCoreIOIMem =>
+        println("VexRiscvCoreIOFullAXI with VexRiscvCoreIOIMem")
+        require(outer.memAXI4Nodes.size == 2, "This core requires imem and dmem AXI ports!")
+        outer.memAXI4Nodes(1).out.head match {
+          case (out, edgeOut) =>
+            io.connectDMem(out)
+        }
+        outer.memAXI4Nodes.head.out.head match {
+          case (out, edgeOut) =>
+            out.aw := DontCare
+            out.w := DontCare
+            out.b := DontCare
 
-      core.io.iBus_ar_ready := out.ar.ready
-      out.ar.valid := core.io.iBus_ar_valid
-      out.ar.bits.id := 0.U
-      out.ar.bits.addr := core.io.iBus_ar_payload_addr
-      out.ar.bits.len := core.io.iBus_ar_payload_len
-      out.ar.bits.size := core.io.iBus_ar_payload_size
-      out.ar.bits.burst := core.io.iBus_ar_payload_burst
-      out.ar.bits.lock := core.io.iBus_ar_payload_lock
-      out.ar.bits.cache := core.io.iBus_ar_payload_cache
-      out.ar.bits.prot := core.io.iBus_ar_payload_prot
-      out.ar.bits.qos := core.io.iBus_ar_payload_qos
+            io.iBus_ar_ready := out.ar.ready
+            out.ar.valid := io.iBus_ar_valid
+            out.ar.bits.id := 0.U
+            out.ar.bits.addr := io.iBus_ar_payload_addr
+            out.ar.bits.len := io.iBus_ar_payload_len
+            out.ar.bits.size := io.iBus_ar_payload_size
+            out.ar.bits.burst := io.iBus_ar_payload_burst
+            out.ar.bits.lock := io.iBus_ar_payload_lock
+            out.ar.bits.cache := io.iBus_ar_payload_cache
+            out.ar.bits.prot := io.iBus_ar_payload_prot
+            out.ar.bits.qos := io.iBus_ar_payload_qos
 
-      out.r.ready := core.io.iBus_r_ready
-      core.io.iBus_r_valid := out.r.valid
-      core.io.iBus_r_payload_data := out.r.bits.data
-      core.io.iBus_r_payload_resp := out.r.bits.resp
-      core.io.iBus_r_payload_last := out.r.bits.last
+            out.r.ready := io.iBus_r_ready
+            io.iBus_r_valid := out.r.valid
+            io.iBus_r_payload_data := out.r.bits.data
+            io.iBus_r_payload_resp := out.r.bits.resp
+            io.iBus_r_payload_last := out.r.bits.last
+        }
+    }
+  } else {
+    println("VexRiscvCoreIOFullAXI")
+    outer.memAXI4Nodes.head.out.head match {
+      case (out, edgeOut) =>
+        core.io.connectDMem(out)
+    }
   }
+  // core.io match {
+  //   case io: VexRiscvCoreIOFullAXI with VexRiscvCoreIOIMem =>
+  //     println("VexRiscvCoreIOFullAXI with VexRiscvCoreIOIMem")
+  //     require(outer.memAXI4Nodes.size == 2, "This core requires imem and dmem AXI ports!")
+  //     outer.memAXI4Nodes(1).out.head match {
+  //       case (out, edgeOut) =>
+  //         io.connectDMem(out)
+  //     }
+  //     outer.memAXI4Nodes.head.out.head match {
+  //       case (out, edgeOut) =>
+  //         out.aw := DontCare
+  //         out.w := DontCare
+  //         out.b := DontCare
+  //
+  //         io.iBus_ar_ready := out.ar.ready
+  //         out.ar.valid := io.iBus_ar_valid
+  //         out.ar.bits.id := 0.U
+  //         out.ar.bits.addr := io.iBus_ar_payload_addr
+  //         out.ar.bits.len := io.iBus_ar_payload_len
+  //         out.ar.bits.size := io.iBus_ar_payload_size
+  //         out.ar.bits.burst := io.iBus_ar_payload_burst
+  //         out.ar.bits.lock := io.iBus_ar_payload_lock
+  //         out.ar.bits.cache := io.iBus_ar_payload_cache
+  //         out.ar.bits.prot := io.iBus_ar_payload_prot
+  //         out.ar.bits.qos := io.iBus_ar_payload_qos
+  //
+  //         out.r.ready := io.iBus_r_ready
+  //         io.iBus_r_valid := out.r.valid
+  //         io.iBus_r_payload_data := out.r.bits.data
+  //         io.iBus_r_payload_resp := out.r.bits.resp
+  //         io.iBus_r_payload_last := out.r.bits.last
+  //     }
+  //   case io: VexRiscvCoreIOFullAXI =>
+  //     println("VexRiscvCoreIOFullAXI")
+  //     outer.memAXI4Nodes.head.out.head match {
+  //       case (out, edgeOut) =>
+  //         io.connectDMem(out)
+  //     }
+  // }
 }
