@@ -6,7 +6,7 @@ import spinal.core.sim.{onSimEnd, simSuccess}
 import spinal.lib._
 import spinal.lib.bus.bmb.sim.BmbMemoryAgent
 import spinal.lib.bus.bmb._
-import spinal.lib.bus.misc.{DefaultMapping, SizeMapping}
+import spinal.lib.bus.misc.{AddressMapping, DefaultMapping, SizeMapping}
 import spinal.lib.bus.wishbone.{Wishbone, WishboneConfig, WishboneToBmb, WishboneToBmbGenerator}
 import spinal.lib.com.jtag.{Jtag, JtagInstructionDebuggerGenerator, JtagTapInstructionCtrl}
 import spinal.lib.com.jtag.sim.JtagTcp
@@ -14,6 +14,7 @@ import spinal.lib.com.jtag.xilinx.Bscane2BmbMasterGenerator
 import spinal.lib.generator._
 import spinal.core.fiber._
 import spinal.idslplugin.PostInitCallback
+import spinal.lib.bus.amba4.axi.Axi4Shared
 import spinal.lib.misc.plic.PlicMapping
 import spinal.lib.system.debugger.SystemDebuggerConfig
 import vexriscv.ip.{DataCacheAck, DataCacheConfig, DataCacheMemBus, InstructionCache, InstructionCacheConfig}
@@ -25,10 +26,12 @@ import scala.collection.mutable.ArrayBuffer
 import spinal.lib.generator._
 import vexriscv.ip.fpu.FpuParameter
 
+import scala.language.postfixOps
+
 case class VexRiscvSmpParameter
 (cpuConfigs: Seq[VexRiscvConfig],
- jtagHeaderIgnoreWidth: Int,
  withExclusiveAndInvalidation: Boolean,
+ jtagHeaderIgnoreWidth: Int = 0,
  forcePeripheralWidth: Boolean = true,
  outOfOrderDecoder: Boolean = true,
  fpu: Boolean = false)
@@ -91,77 +94,67 @@ class VexRiscvSmpBase(p: VexRiscvSmpParameter) extends Area with PostInitCallbac
   }
 }
 
+case class BmbToAxiSharedGenerator(mapping: AddressMapping)(implicit interconnect: BmbInterconnectGenerator) extends Area {
+  val bmb = Handle(logic.io.input)
+  val axiShared = Handle(logic.io.output)
 
-class VexRiscvSmpWithPeripherals(p: VexRiscvSmpParameter) extends VexRiscvSmpBase(p) {
-  val peripheralBridge = BmbToWishboneGenerator(DefaultMapping)
-  val peripheral = Handle(peripheralBridge.logic.io.output.toIo)
-  if (p.forcePeripheralWidth) interconnect.slaves(peripheralBridge.bmb).forceAccessSourceDataWidth(32)
-
-  val plic = BmbPlicGenerator()(interconnect = null)
-  plic.priorityWidth.load(2)
-  plic.mapping.load(PlicMapping.sifive)
-
-  val plicWishboneBridge = new Generator {
-    dependencies += plic.ctrl
-
-    plic.accessRequirements.load(BmbAccessParameter(
-      addressWidth = 22,
-      dataWidth = 32
-    ).addSources(1, BmbSourceParameter(
-      contextWidth = 0,
-      lengthWidth = 2,
-      alignment = BmbParameter.BurstAlignement.LENGTH
-    )))
-
-    val logic = add task new Area {
-      val bridge = WishboneToBmb(WishboneConfig(20, 32))
-      bridge.io.output >> plic.ctrl
-    }
-  }
-  val plicWishbone = plicWishboneBridge.produceIo(plicWishboneBridge.logic.bridge.io.input)
-
-  val clint = BmbClintGenerator(0)(interconnect = null)
-  val clintWishboneBridge = new Generator {
-    dependencies += clint.ctrl
-
-    clint.accessRequirements.load(BmbAccessParameter(
-      addressWidth = 16,
-      dataWidth = 32
-    ).addSources(1, BmbSourceParameter(
-      contextWidth = 0,
-      lengthWidth = 2,
-      alignment = BmbParameter.BurstAlignement.LENGTH
-    )))
-
-    val logic = add task new Area {
-      val bridge = WishboneToBmb(WishboneConfig(14, 32))
-      bridge.io.output >> clint.ctrl
-    }
-  }
-  val clintWishbone = clintWishboneBridge.produceIo(clintWishboneBridge.logic.bridge.io.input)
-
-  val interrupts = in Bits (32 bits)
-  for (i <- 1 to 31) yield plic.addInterrupt(interrupts(i), i)
-
-  for ((core, cpuId) <- cores.zipWithIndex) {
-    core.cpu.setTimerInterrupt(clint.timerInterrupt(cpuId))
-    core.cpu.setSoftwareInterrupt(clint.softwareInterrupt(cpuId))
-    plic.priorityWidth.load(2)
-    plic.mapping.load(PlicMapping.sifive)
-    plic.addTarget(core.cpu.externalInterrupt)
-    plic.addTarget(core.cpu.externalSupervisorInterrupt)
-    List(clint.logic, core.cpu.logic).produce {
-      for (plugin <- core.cpu.config.plugins) plugin match {
-        case plugin: CsrPlugin if plugin.utime != null => plugin.utime := clint.logic.io.time
-        case _ =>
-      }
-    }
-  }
-
-  clint.cpuCount.load(cpuCount)
+  val accessSource = Handle[BmbAccessCapabilities]
+  val accessRequirements = Handle[BmbAccessParameter]
+  interconnect.addSlave(
+    accessSource = accessSource,
+    accessCapabilities = accessSource,
+    accessRequirements = accessRequirements,
+    bus = bmb,
+    mapping = mapping
+  )
+  val logic = Handle(BmbToAxi4SharedBridge(
+    accessRequirements.toBmbParameter()
+  ))
 }
 
-class VexRiscvSmp(p: VexRiscvSmpParameter) extends VexRiscvSmpBase(p)
+
+class VexRiscvSmp(p: VexRiscvSmpParameter) extends VexRiscvSmpBase(p) {
+  val axiBridge = BmbToAxiSharedGenerator(DefaultMapping)
+  val dBus = Handle(axiBridge.logic.io.output.toIo)
+  // if (p.forcePeripheralWidth) interconnect.slaves(axiBridge.bmb).forceAccessSourceDataWidth(32)
+
+  val iArbiter = BmbBridgeGenerator()
+
+  for (core <- cores) interconnect.addConnection(core.cpu.iBus -> List(iArbiter.bmb))
+  interconnect.addConnection(
+    iArbiter.bmb -> List(axiBridge.bmb),
+    dBusNonCoherent.bmb -> List(axiBridge.bmb)
+  )
+  for (core <- cores) {
+    interconnect.setPipelining(core.cpu.dBus)(cmdValid = true, cmdReady = true, rspValid = true, invValid = true, ackValid = true, syncValid = true)
+    interconnect.setPipelining(core.cpu.iBus)(cmdHalfRate = true, rspValid = true)
+    interconnect.setPipelining(iArbiter.bmb)(cmdHalfRate = true, rspValid = true)
+  }
+  interconnect.setPipelining(dBusCoherent.bmb)(cmdValid = true, cmdReady = true)
+  interconnect.setPipelining(dBusNonCoherent.bmb)(cmdValid = true, cmdReady = true, rspValid = true)
+  interconnect.setPipelining(axiBridge.bmb)(cmdHalfRate = true, cmdValid = false, cmdReady = false, rspValid = true)
+
+  val timerInterrupt = in UInt (p.cpuConfigs.size bits)
+  val softwareInterrupt = in UInt (p.cpuConfigs.size bits)
+  val externalInterrupt = in UInt (p.cpuConfigs.size bits)
+  val externalSupervisorInterrupt = in UInt (p.cpuConfigs.size bits)
+  val utime = Seq.fill(p.cpuConfigs.size)(in UInt (64 bits))
+
+  for ((core, cpuId) <- cores.zipWithIndex) {
+    core.cpu.setTimerInterrupt(timerInterrupt(cpuId))
+    core.cpu.setSoftwareInterrupt(softwareInterrupt(cpuId))
+    Handle(new Area {
+      core.cpu.externalInterrupt := externalInterrupt(cpuId)
+      core.cpu.externalSupervisorInterrupt := externalInterrupt(cpuId)
+      for (plugin <- core.cpu.config.plugins) plugin match {
+        case plugin: CsrPlugin =>
+          if (plugin.utime != null) plugin.utime := utime(cpuId)
+          else println(s"null utime code id $cpuId")
+        case _ =>
+      }
+    })
+  }
+}
 
 object VexRiscvSmpGen {
   def vexRiscvConfig
@@ -373,4 +366,30 @@ object VexRiscvSmpGen {
   //     vexRiscvCluster(4)
   //   }
   // }
+
+  def main(args: Array[String]): Unit = {
+    def dutGen = {
+      val cpuCount = 4
+      val resetVector = 0
+      val parameter = VexRiscvSmpParameter(
+        cpuConfigs = List.tabulate(cpuCount) {
+          vexRiscvConfig(_, resetVector = resetVector)
+        }, withExclusiveAndInvalidation = true
+      )
+      // val toplevel = new Component {
+      class VexCoreSmp extends Component {
+        val body = new VexRiscvSmp(
+          p = parameter
+        )
+        body.setName("")
+      }
+      // }
+      // toplevel
+      new VexCoreSmp
+    }
+
+    // val genConfig = SpinalConfig(targetDirectory = netlistDirectory, inlineRom = true).addStandardMemBlackboxing(blackboxByteEnables)
+    // genConfig.generateVerilog(dutGen.setDefinitionName(netlistName))
+    SpinalConfig().generateVerilog(dutGen)
+  }
 }
