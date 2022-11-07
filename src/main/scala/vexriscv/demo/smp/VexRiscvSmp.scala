@@ -1,30 +1,18 @@
 package vexriscv.demo.smp
 
-import spinal.core
 import spinal.core._
-import spinal.core.sim.{onSimEnd, simSuccess}
-import spinal.lib._
-import spinal.lib.bus.bmb.sim.BmbMemoryAgent
-import spinal.lib.bus.bmb._
-import spinal.lib.bus.misc.{AddressMapping, DefaultMapping, SizeMapping}
-import spinal.lib.bus.wishbone.{Wishbone, WishboneConfig, WishboneToBmb, WishboneToBmbGenerator}
-import spinal.lib.com.jtag.{Jtag, JtagInstructionDebuggerGenerator, JtagTapInstructionCtrl}
-import spinal.lib.com.jtag.sim.JtagTcp
-import spinal.lib.com.jtag.xilinx.Bscane2BmbMasterGenerator
-import spinal.lib.generator._
 import spinal.core.fiber._
 import spinal.idslplugin.PostInitCallback
-import spinal.lib.bus.amba4.axi.Axi4Shared
-import spinal.lib.misc.plic.PlicMapping
-import spinal.lib.system.debugger.SystemDebuggerConfig
-import vexriscv.ip.{DataCacheAck, DataCacheConfig, DataCacheMemBus, InstructionCache, InstructionCacheConfig}
-import vexriscv.plugin._
-import vexriscv.{Riscv, VexRiscv, VexRiscvBmbGenerator, VexRiscvConfig, plugin}
-
-import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
+import spinal.lib.bus.amba4.axi.{Axi4Config, Axi4Shared}
+import spinal.lib.bus.bmb._
+import spinal.lib.bus.misc.{AddressMapping, DefaultMapping, SizeMapping}
+import spinal.lib.com.jtag.JtagInstructionDebuggerGenerator
 import spinal.lib.generator._
+import spinal.lib.master
 import vexriscv.ip.fpu.FpuParameter
+import vexriscv.ip.{DataCacheConfig, InstructionCacheConfig}
+import vexriscv.plugin._
+import vexriscv.{Riscv, VexRiscvBmbGenerator, VexRiscvConfig, plugin}
 
 import scala.language.postfixOps
 
@@ -36,16 +24,27 @@ case class VexRiscvSmpParameter
  outOfOrderDecoder: Boolean = true,
  fpu: Boolean = false)
 
-class VexRiscvSmpBase(p: VexRiscvSmpParameter) extends Area with PostInitCallback {
+class VexRiscvSmpBase(p: VexRiscvSmpParameter, enableDebug: Boolean = false) extends Area with PostInitCallback {
   val cpuCount = p.cpuConfigs.size
 
-  val debugCd = ClockDomainResetGenerator()
-  debugCd.holdDuration.load(4095)
-  debugCd.makeExternal()
+  val debugCd = if (enableDebug) {
+    val debugCd = ClockDomainResetGenerator()
+    debugCd.holdDuration.load(4095)
+    debugCd.makeExternal()
+    debugCd
+  } else null
 
-  val systemCd = ClockDomainResetGenerator()
-  systemCd.holdDuration.load(63)
-  systemCd.setInput(debugCd)
+  val systemCd = if (enableDebug) {
+    val systemCd = ClockDomainResetGenerator()
+    systemCd.holdDuration.load(63)
+    systemCd.setInput(debugCd)
+    systemCd
+  } else {
+    val systemCd = ClockDomainResetGenerator()
+    systemCd.holdDuration.load(63)
+    systemCd.makeExternal()
+    systemCd
+  }
 
 
   val ctx = systemCd.outputClockDomain.push()
@@ -57,10 +56,10 @@ class VexRiscvSmpBase(p: VexRiscvSmpParameter) extends Area with PostInitCallbac
 
   implicit val interconnect = BmbInterconnectGenerator()
 
-  val debugBridge = debugCd.outputClockDomain on JtagInstructionDebuggerGenerator(p.jtagHeaderIgnoreWidth)
-  debugBridge.jtagClockDomain.load(ClockDomain.external("jtag", withReset = false))
-
-  val debugPort = Handle(debugBridge.logic.jtagBridge.io.ctrl.toIo)
+  // val debugBridge = debugCd.outputClockDomain on JtagInstructionDebuggerGenerator(p.jtagHeaderIgnoreWidth)
+  // debugBridge.jtagClockDomain.load(ClockDomain.external("jtag", withReset = false))
+  //
+  // val debugPort = Handle(debugBridge.logic.jtagBridge.io.ctrl.toIo)
 
   val dBusCoherent = BmbBridgeGenerator()
   val dBusNonCoherent = BmbBridgeGenerator()
@@ -85,12 +84,13 @@ class VexRiscvSmpBase(p: VexRiscvSmpParameter) extends Area with PostInitCallbac
     interconnect.addConnection(
       cpu.dBus -> List(dBusCoherent.bmb)
     )
-    cpu.enableDebugBmb(
-      debugCd = debugCd.outputClockDomain,
-      resetCd = systemCd,
-      mapping = SizeMapping(cpuId * 0x1000, 0x1000)
-    )
-    interconnect.addConnection(debugBridge.bmb, cpu.debugBmb)
+    // cpu.enableDebugBmb(
+    //   debugCd = debugCd.outputClockDomain,
+    //   resetCd = systemCd,
+    //   mapping = SizeMapping(cpuId * 0x1000, 0x1000)
+    // )
+    cpu.disableDebug()
+    // interconnect.addConnection(debugBridge.bmb, cpu.debugBmb)
   }
 }
 
@@ -113,9 +113,10 @@ case class BmbToAxiSharedGenerator(mapping: AddressMapping)(implicit interconnec
 }
 
 
-class VexRiscvSmp(p: VexRiscvSmpParameter) extends VexRiscvSmpBase(p) {
+class VexRiscvSmp(p: VexRiscvSmpParameter, enableDebug: Boolean = false)
+  extends VexRiscvSmpBase(p, enableDebug = enableDebug) {
   val axiBridge = BmbToAxiSharedGenerator(DefaultMapping)
-  val dBus = Handle(axiBridge.logic.io.output.toIo)
+  val dBus: Axi4Shared = Handle(axiBridge.logic.io.output.toIo)
   // if (p.forcePeripheralWidth) interconnect.slaves(axiBridge.bmb).forceAccessSourceDataWidth(32)
 
   val iArbiter = BmbBridgeGenerator()
@@ -369,27 +370,31 @@ object VexRiscvSmpGen {
 
   def main(args: Array[String]): Unit = {
     def dutGen = {
-      val cpuCount = 4
-      val resetVector = 0
+      val cpuCount = 2
+      val enableDebug = false
       val parameter = VexRiscvSmpParameter(
         cpuConfigs = List.tabulate(cpuCount) {
-          vexRiscvConfig(_, resetVector = resetVector)
+          vexRiscvConfig(_,
+            resetVector = 0x80000000L,
+            ioRange = _ (31 downto 28) =/= 0x8,
+            iBusWidth = 64,
+            dBusWidth = 64,
+            iCacheSize = 4096,
+            iCacheWays = 1,
+            dCacheSize = 4096,
+            dCacheWays = 1,
+            prediction = DYNAMIC_TARGET
+          )
         }, withExclusiveAndInvalidation = true
       )
-      // val toplevel = new Component {
       class VexCoreSmp extends Component {
         val body = new VexRiscvSmp(
-          p = parameter
+          p = parameter, enableDebug = enableDebug
         )
         body.setName("")
       }
-      // }
-      // toplevel
       new VexCoreSmp
     }
-
-    // val genConfig = SpinalConfig(targetDirectory = netlistDirectory, inlineRom = true).addStandardMemBlackboxing(blackboxByteEnables)
-    // genConfig.generateVerilog(dutGen.setDefinitionName(netlistName))
     SpinalConfig().generateVerilog(dutGen)
   }
 }
