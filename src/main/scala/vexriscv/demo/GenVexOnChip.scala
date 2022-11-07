@@ -37,13 +37,50 @@ object VexOnChipConfig {
       bigEndian = bigEndian
     ),
     // new CsrPlugin(CsrPluginConfig.smallest(mtvecInit = 0x80000020l)),
-    new CsrPlugin(CsrPluginConfig.linuxFull(0x80000020L)),
+    // new CsrPlugin(CsrPluginConfig.linuxFull(0x80000020L)),
+    new CsrPlugin(
+      config = CsrPluginConfig(
+        catchIllegalAccess = true,
+        mvendorid = 1,
+        marchid = 2,
+        mimpid = 3,
+        mhartid = 0,
+        misaExtensionsInit = 0, // raw is 66
+        misaAccess = CsrAccess.READ_WRITE,
+        mtvecAccess = CsrAccess.READ_WRITE,
+        mtvecInit = 0x80000080L,
+        mepcAccess = CsrAccess.READ_WRITE,
+        mscratchGen = true,
+        mcauseAccess = CsrAccess.READ_WRITE,
+        mbadaddrAccess = CsrAccess.READ_WRITE,
+        mcycleAccess = CsrAccess.READ_WRITE,
+        minstretAccess = CsrAccess.READ_WRITE,
+        ucycleAccess = CsrAccess.READ_ONLY,
+        uinstretAccess = CsrAccess.READ_ONLY,
+        wfiGenAsWait = true,
+        ecallGen = true,
+        xtvecModeGen = false,
+        noCsrAlu = false,
+        wfiGenAsNop = false,
+        ebreakGen = false,
+        userGen = true,
+        supervisorGen = false,
+        sscratchGen = true,
+        stvecAccess = CsrAccess.READ_WRITE,
+        sepcAccess = CsrAccess.READ_WRITE,
+        scauseAccess = CsrAccess.READ_WRITE,
+        sbadaddrAccess = CsrAccess.READ_WRITE,
+        scycleAccess = CsrAccess.READ_WRITE,
+        sinstretAccess = CsrAccess.READ_WRITE,
+        satpAccess = CsrAccess.NONE, //Implemented into the MMU plugin
+        medelegAccess = CsrAccess.READ_WRITE,
+        midelegAccess = CsrAccess.READ_WRITE,
+        pipelineCsrRead = false,
+        deterministicInteruptionEntry = false
+      )
+    ),
     new StaticMemoryTranslatorPlugin(
-      // ioRange = _ (31 downto 24) === 0x54
-      // for Uart and SPIFlash
-      // ioRange = addr => addr(31 downto 24) === 0x54 || addr(31 downto 24) === 0x20
-      // except ram
-      ioRange = _ (31 downto 28) =/= 0x8
+      ioRange = addr => addr(31 downto 28) =/= 0x8 && addr(31 downto 16) =/= 0x0001
     ),
     new DecoderSimplePlugin(
       catchIllegalInstruction = false
@@ -69,7 +106,8 @@ object VexOnChipConfig {
     ),
     new BranchPlugin(
       earlyBranch = false,
-      catchAddressMisaligned = false
+      catchAddressMisaligned = false,
+      fenceiGenAsANop = true
     ),
     new YamlPlugin("cpu0.yaml"),
     new SimpleFormalPlugin
