@@ -21,6 +21,7 @@ case class VexOnChipConfig
  hardwareBreakpointCount: Int = 2,
  replaceMemoryIP: Boolean = false,
  resetVector: BigInt = VexInterfaceConfig.resetVector,
+ debug: Boolean = false,
  cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexOnChipConfig.defaultPlugins(bigEndian = false)) {
 }
 // object VexOnChipConfig {

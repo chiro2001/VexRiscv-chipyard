@@ -330,7 +330,7 @@ trait VexRiscvCoreIOBasic extends Bundle
   with VexRiscvCoreIOBase
   with VexRiscvCoreIOIRQ
   with VexRiscvCoreIOIRvfi
-  with VexRiscvCoreIOJtag
+  // with VexRiscvCoreIOJtag
 
 class VexRiscvCoreIOFullAXI extends Bundle
   with VexRiscvCoreIODMemFullConfig
@@ -367,7 +367,8 @@ abstract class VexCoreBase
       dCacheSize = config.dCacheSize,
       hardwareBreakpointCount = config.hardwareBreakpointCount,
       resetVector = config.resetVector,
-      hartId = hartId
+      hartId = hartId,
+      debug = config.debug
     ), name = moduleName)
   }
   val writer = new PrintWriter(new File(targetVerilogFile))
