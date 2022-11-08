@@ -1,6 +1,9 @@
-bootrom_elf = bootrom.rv32.elf bootrom.sim.rv32.elf
-bootrom_img = bootrom.rv32.img bootrom.sim.rv32.img
-bootrom_dump = bootrom.rv32.dump bootrom.sim.rv32.dump
+bootrom_elf = bootrom.rv32.elf bootrom.sim.rv32.elf bootrom.rom.rv32.elf
+bootrom_img = bootrom.rv32.img bootrom.sim.rv32.img bootrom.rom.rv32.img
+bootrom_dump = bootrom.rv32.dump bootrom.sim.rv32.dump bootrom.rom.rv32.dump
+
+COREMARK_MAKE ?= $(abspath .)/../../../../../../software/coremark/riscv-coremark/perfN-rom
+COREMARK ?= $(COREMARK_MAKE)/../../overlay/coremark.perfN.rom.bin
 
 CROSS_COMPILE := riscv-none-embed-
 GCC=$(CROSS_COMPILE)gcc
@@ -27,6 +30,11 @@ elf: $(bootrom_elf)
 
 %.dump: %.elf
 	$(OBJDUMP) -d -S $< > $@
+
+%.rom.rv32.img: %.rom.rv32.elf
+	$(OBJCOPY) -O binary --change-addresses=-0x10000 $< $@
+	$(MAKE) -C $(COREMARK_MAKE)
+	dd if=$(COREMARK) of=$@ bs=384 seek=1 conv=notrunc
 
 clean:
 	-rm -f *.elf *.dump *.img
