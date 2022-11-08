@@ -371,7 +371,7 @@ abstract class VexCoreBase
     ), name = moduleName)
   }
   val writer = new PrintWriter(new File(targetVerilogFile))
-  val preprocessed = processFileContent(Source.fromFile(targetVerilogFile).getLines().mkString("\n"), hartId)
+  val preprocessed = processFileContent(Source.fromFile(sourceVerilogFile).getLines().mkString("\n"), hartId)
   writer.write(preprocessed)
   writer.close()
 
