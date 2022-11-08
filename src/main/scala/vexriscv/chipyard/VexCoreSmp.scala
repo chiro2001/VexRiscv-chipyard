@@ -14,12 +14,7 @@ package vexriscv.chipyard
 import chipsalliance.rocketchip.config.Parameters
 import chisel3._
 import chisel3.util._
-import freechips.rocketchip.amba.axi4.AXI4Bundle
-import spinal.core.SpinalConfig
 import vexriscv.demo.smp.VexRiscvSmpGen
-import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAxiConfig, VexAxiCore, VexInterfaceConfig, VexOnChip, VexOnChipConfig}
-// import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreSmpUse}
-import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreSmpUse}
 
 import scala.tools.nsc.io.File
 

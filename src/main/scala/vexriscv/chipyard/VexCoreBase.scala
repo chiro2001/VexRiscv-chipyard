@@ -19,6 +19,7 @@ import vexriscv.chipyard.VexCoreBase.processFileContent
 import vexriscv.demo.{GenVexOnChip, VexAxiConfig, VexAxiCore}
 
 import java.io.{File, PrintWriter}
+import java.util.Date
 import scala.io.Source
 
 trait VexRiscvCoreIOIRvfi extends Bundle {
@@ -368,13 +369,20 @@ abstract class VexCoreBase
       hardwareBreakpointCount = config.hardwareBreakpointCount,
       resetVector = config.resetVector,
       hartId = hartId,
-      debug = config.debug
-    ), name = moduleName)
+      debug = config.debug,
+      name = moduleName
+    ))
   }
   val writer = new PrintWriter(new File(targetVerilogFile))
   val preprocessed = processFileContent(Source.fromFile(sourceVerilogFile).getLines().mkString("\n"), hartId)
   writer.write(preprocessed)
   writer.close()
+
+  val fpgaDir = s"$chipyardDir/fpga"
+  val configFileName = s"VexConfig-${new Date().toString}.ini"
+  val configWriter = new PrintWriter(new File(configFileName))
+  configWriter.println(s"${config.toString}")
+  configWriter.close()
 
   addPath(targetVerilogFile)
 }

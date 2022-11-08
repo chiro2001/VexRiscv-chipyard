@@ -16,6 +16,10 @@ import scala.collection.mutable.ArrayBuffer
 import scala.language.postfixOps
 import scala.sys.process._
 
+object VexDefaultConfig {
+  val resetVector = 0x10000L
+}
+
 case class VexChipConfig
 (iCacheSize: Int = 0,
  onChipRamSize: BigInt = 64 KiB,
@@ -26,7 +30,7 @@ case class VexChipConfig
  pipelineDBus: Boolean = true,
  pipelineApbBridge: Boolean = true,
  debug: Boolean = true,
- resetVector: BigInt = vexriscv.demo.VexInterfaceConfig.resetVector,
+ resetVector: BigInt = vexriscv.demo.VexDefaultConfig.resetVector,
  negativeReset: Boolean = false,
  uartBaudRate: Int = 115200,
  replaceMemoryIP: Boolean = false,

@@ -20,7 +20,7 @@ case class VexOnChipConfig
  onChipRamBinaryFile: String = null,
  hardwareBreakpointCount: Int = 2,
  replaceMemoryIP: Boolean = false,
- resetVector: BigInt = VexInterfaceConfig.resetVector,
+ resetVector: BigInt = VexDefaultConfig.resetVector,
  debug: Boolean = false,
  cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexOnChipConfig.defaultPlugins(bigEndian = false)) {
 }
@@ -28,7 +28,7 @@ case class VexOnChipConfig
 //   def apply(iCacheSize: BigInt, onChipRamSize: BigInt,)
 // }
 
-import vexriscv.demo.VexInterfaceConfig._
+import vexriscv.demo.VexDefaultConfig._
 
 object VexOnChipConfig {
   def defaultPlugins(bigEndian: Boolean) = ArrayBuffer( //DebugPlugin added by the toplevel
