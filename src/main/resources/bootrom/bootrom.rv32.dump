@@ -6,78 +6,58 @@ Disassembly of section .start:
 
 00010000 <_start>:
    10000:	f1402573          	csrr	a0,mhartid
-   10004:	0e051e63          	bnez	a0,10100 <_dtb>
+   10004:	0a051263          	bnez	a0,100a8 <_dtb>
    10008:	54000537          	lui	a0,0x54000
    1000c:	00000593          	li	a1,0
-   10010:	00b52823          	sw	a1,16(a0) # 54000010 <__bss_end+0x53feeed0>
+   10010:	00b52823          	sw	a1,16(a0) # 54000010 <__bss_end+0x53feef50>
    10014:	00100593          	li	a1,1
    10018:	00b52423          	sw	a1,8(a0)
    1001c:	00100593          	li	a1,1
    10020:	00b52623          	sw	a1,12(a0)
-   10024:	05300593          	li	a1,83
-   10028:	05400613          	li	a2,84
-   1002c:	04100693          	li	a3,65
-   10030:	05200713          	li	a4,82
-   10034:	05400793          	li	a5,84
-   10038:	00a00813          	li	a6,10
-   1003c:	00b52023          	sw	a1,0(a0)
-   10040:	00c52023          	sw	a2,0(a0)
-   10044:	00d52023          	sw	a3,0(a0)
-   10048:	00e52023          	sw	a4,0(a0)
-   1004c:	00f52023          	sw	a5,0(a0)
-   10050:	01052023          	sw	a6,0(a0)
-   10054:	03c0006f          	j	10090 <start_copy>
+   10024:	04200993          	li	s3,66
+   10028:	01352023          	sw	s3,0(a0)
+   1002c:	03c0006f          	j	10068 <start_copy>
 
-00010058 <_copy_flash>:
-   10058:	201005b7          	lui	a1,0x20100
-   1005c:	80000637          	lui	a2,0x80000
-   10060:	000406b7          	lui	a3,0x40
-   10064:	ffc68693          	addi	a3,a3,-4 # 3fffc <__bss_end+0x2eebc>
+00010030 <_copy_flash>:
+   10030:	201005b7          	lui	a1,0x20100
+   10034:	80000637          	lui	a2,0x80000
+   10038:	000406b7          	lui	a3,0x40
+   1003c:	ffc68693          	addi	a3,a3,-4 # 3fffc <__bss_end+0x2ef3c>
 
-00010068 <_copy_flash_loop>:
-   10068:	0005a283          	lw	t0,0(a1) # 20100000 <__bss_end+0x200eeec0>
-   1006c:	00562023          	sw	t0,0(a2) # 80000000 <__bss_end+0x7ffeeec0>
-   10070:	00458593          	addi	a1,a1,4
-   10074:	00460613          	addi	a2,a2,4
-   10078:	ffc68693          	addi	a3,a3,-4
-   1007c:	0155f933          	and	s2,a1,s5
-   10080:	01249463          	bne	s1,s2,10088 <skip_dot>
-   10084:	013a2023          	sw	s3,0(s4)
+00010040 <_copy_flash_loop>:
+   10040:	0005a283          	lw	t0,0(a1) # 20100000 <__bss_end+0x200eef40>
+   10044:	00562023          	sw	t0,0(a2) # 80000000 <__bss_end+0x7ffeef40>
+   10048:	00458593          	addi	a1,a1,4
+   1004c:	00460613          	addi	a2,a2,4
+   10050:	ffc68693          	addi	a3,a3,-4
+   10054:	0155f933          	and	s2,a1,s5
+   10058:	01249463          	bne	s1,s2,10060 <skip_dot>
+   1005c:	013a2023          	sw	s3,0(s4)
 
-00010088 <skip_dot>:
-   10088:	fe0690e3          	bnez	a3,10068 <_copy_flash_loop>
-   1008c:	00008067          	ret
+00010060 <skip_dot>:
+   10060:	fe0690e3          	bnez	a3,10040 <_copy_flash_loop>
+   10064:	00008067          	ret
 
-00010090 <start_copy>:
-   10090:	000084b7          	lui	s1,0x8
-   10094:	02e00993          	li	s3,46
-   10098:	54000a37          	lui	s4,0x54000
-   1009c:	00010ab7          	lui	s5,0x10
-   100a0:	fffa8a93          	addi	s5,s5,-1 # ffff <__STACKSIZE__+0xefff>
-   100a4:	fb5ff0ef          	jal	ra,10058 <_copy_flash>
-   100a8:	04300593          	li	a1,67
-   100ac:	04f00613          	li	a2,79
-   100b0:	05000693          	li	a3,80
-   100b4:	05900713          	li	a4,89
-   100b8:	02e00793          	li	a5,46
-   100bc:	00a00813          	li	a6,10
-   100c0:	00b52023          	sw	a1,0(a0)
-   100c4:	00c52023          	sw	a2,0(a0)
-   100c8:	00d52023          	sw	a3,0(a0)
-   100cc:	00e52023          	sw	a4,0(a0)
-   100d0:	00f52023          	sw	a5,0(a0)
-   100d4:	01052023          	sw	a6,0(a0)
-   100d8:	00004537          	lui	a0,0x4
-   100dc:	00052503          	lw	a0,0(a0) # 4000 <__STACKSIZE__+0x3000>
-   100e0:	34151073          	csrw	mepc,a0
-   100e4:	f1402573          	csrr	a0,mhartid
-   100e8:	00000597          	auipc	a1,0x0
-   100ec:	01858593          	addi	a1,a1,24 # 10100 <_dtb>
-   100f0:	08000613          	li	a2,128
-   100f4:	30063073          	csrc	mstatus,a2
-   100f8:	30200073          	mret
-   100fc:	00000013          	nop
+00010068 <start_copy>:
+   10068:	000084b7          	lui	s1,0x8
+   1006c:	54000a37          	lui	s4,0x54000
+   10070:	00010ab7          	lui	s5,0x10
+   10074:	fffa8a93          	addi	s5,s5,-1 # ffff <__STACKSIZE__+0xefff>
+   10078:	fb9ff0ef          	jal	ra,10030 <_copy_flash>
+   1007c:	04400593          	li	a1,68
+   10080:	00b52023          	sw	a1,0(a0)
+   10084:	00004537          	lui	a0,0x4
+   10088:	00052503          	lw	a0,0(a0) # 4000 <__STACKSIZE__+0x3000>
+   1008c:	34151073          	csrw	mepc,a0
+   10090:	f1402573          	csrr	a0,mhartid
+   10094:	00000597          	auipc	a1,0x0
+   10098:	01458593          	addi	a1,a1,20 # 100a8 <_dtb>
+   1009c:	08000613          	li	a2,128
+   100a0:	30063073          	csrc	mstatus,a2
+   100a4:	30200073          	mret
 
-00010100 <_dtb>:
-   10100:	10500073          	wfi
-   10104:	ffdff06f          	j	10100 <_dtb>
+000100a8 <_dtb>:
+   100a8:	10500073          	wfi
+   100ac:	ffdff06f          	j	100a8 <_dtb>
+   100b0:	0000                	unimp
+	...

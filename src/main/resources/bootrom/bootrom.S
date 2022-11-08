@@ -17,20 +17,10 @@ _start:
 	li a1,1
 	sw a1,12(a0)
 
-	// print START\n
-	addi a1,zero,'S'
-	addi a2,zero,'T'
-	addi a3,zero,'A'
-	addi a4,zero,'R'
-	addi a5,zero,'T'
-	addi a6,zero,'\n'
-  sw a1,0(a0)
-	sw a2,0(a0)
-	sw a3,0(a0)
-	sw a4,0(a0)
-	sw a5,0(a0)
-	sw a6,0(a0)
-  j start_copy
+	// print B
+	addi s3,zero,'B'
+	sw s3,0(a0)
+	j start_copy
 
 _copy_flash:
 	// flash_addr
@@ -55,24 +45,14 @@ skip_dot:
 
 start_copy:
 	li s1, (32 * 0x400)
-	li s3, '.'
+	# li s3, '.'
 	lui s4,0x54000000>>12
 	li s5, 0xffff
   jal _copy_flash
 
-	// print COPY.\n
-	addi a1,zero,'C'
-	addi a2,zero,'O'
-	addi a3,zero,'P'
-	addi a4,zero,'Y'
-	addi a5,zero,'.'
-	addi a6,zero,'\n'
-  sw a1,0(a0)
-	sw a2,0(a0)
-	sw a3,0(a0)
-	sw a4,0(a0)
-	sw a5,0(a0)
-	sw a6,0(a0)
+	// print D
+	addi a1,zero,'D'
+	sw a1,0(a0)
 
   li a0, BOOTADDR_REG
   lw a0, 0(a0)
