@@ -379,7 +379,7 @@ abstract class VexCoreBase
   writer.close()
 
   val fpgaDir = s"$chipyardDir/fpga"
-  val configFileName = s"VexConfig-${new Date().toString}.ini"
+  val configFileName = s"$fpgaDir/VexConfig-${new Date().toString}.ini"
   val configWriter = new PrintWriter(new File(configFileName))
   configWriter.println(s"${config.toString}")
   configWriter.close()
