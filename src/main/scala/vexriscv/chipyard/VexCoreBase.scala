@@ -71,6 +71,30 @@ trait VexRiscvCoreIOIMem extends Bundle {
   //   input      [0:0]    iBus_r_payload_id,
   //   input      [1:0]    iBus_r_payload_resp,
   //   input               iBus_r_payload_last,
+
+  def connectIMem(out: AXI4Bundle) = {
+    out.aw := DontCare
+    out.w := DontCare
+    out.b := DontCare
+
+    iBus_ar_ready := out.ar.ready
+    out.ar.valid := iBus_ar_valid
+    out.ar.bits.id := 0.U
+    out.ar.bits.addr := iBus_ar_payload_addr
+    out.ar.bits.len := iBus_ar_payload_len
+    out.ar.bits.size := iBus_ar_payload_size
+    out.ar.bits.burst := iBus_ar_payload_burst
+    out.ar.bits.lock := iBus_ar_payload_lock
+    out.ar.bits.cache := iBus_ar_payload_cache
+    out.ar.bits.prot := iBus_ar_payload_prot
+    out.ar.bits.qos := iBus_ar_payload_qos
+
+    out.r.ready := iBus_r_ready
+    iBus_r_valid := out.r.valid
+    iBus_r_payload_data := out.r.bits.data
+    iBus_r_payload_resp := out.r.bits.resp
+    iBus_r_payload_last := out.r.bits.last
+  }
 }
 
 trait VexRiscvCoreIODMemConnector {

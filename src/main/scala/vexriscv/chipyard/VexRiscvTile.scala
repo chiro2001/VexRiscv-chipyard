@@ -327,7 +327,6 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   if (core.io.isInstanceOf[VexRiscvCoreIOIMem]) {
     core.io match {
       case io: VexRiscvCoreIOFullAXI with VexRiscvCoreIOIMem =>
-        println("VexRiscvCoreIOFullAXI with VexRiscvCoreIOIMem")
         require(outer.memAXI4Nodes.size == 2, "This core requires imem and dmem AXI ports!")
         outer.memAXI4Nodes(1).out.head match {
           case (out, edgeOut) =>
@@ -335,27 +334,7 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
         }
         outer.memAXI4Nodes.head.out.head match {
           case (out, edgeOut) =>
-            out.aw := DontCare
-            out.w := DontCare
-            out.b := DontCare
-
-            io.iBus_ar_ready := out.ar.ready
-            out.ar.valid := io.iBus_ar_valid
-            out.ar.bits.id := 0.U
-            out.ar.bits.addr := io.iBus_ar_payload_addr
-            out.ar.bits.len := io.iBus_ar_payload_len
-            out.ar.bits.size := io.iBus_ar_payload_size
-            out.ar.bits.burst := io.iBus_ar_payload_burst
-            out.ar.bits.lock := io.iBus_ar_payload_lock
-            out.ar.bits.cache := io.iBus_ar_payload_cache
-            out.ar.bits.prot := io.iBus_ar_payload_prot
-            out.ar.bits.qos := io.iBus_ar_payload_qos
-
-            out.r.ready := io.iBus_r_ready
-            io.iBus_r_valid := out.r.valid
-            io.iBus_r_payload_data := out.r.bits.data
-            io.iBus_r_payload_resp := out.r.bits.resp
-            io.iBus_r_payload_last := out.r.bits.last
+            io.connectIMem(out)
         }
     }
   } else {
