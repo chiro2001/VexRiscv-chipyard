@@ -372,7 +372,7 @@ class VexChipSmp(config: VexChipSmpConfig) extends Module {
 
     axiCrossbar.build()
 
-    io.reqBus = master(reqBus.toAxi4().toFullConfig().setName("reqBus"))
+    // io.reqBus = master(reqBus.toAxi4().toFullConfig().setName("reqBus"))
     cpus.foreach(cpu => {
       // cpu.timerInterrupt := False
       // cpu.externalInterrupt := False
