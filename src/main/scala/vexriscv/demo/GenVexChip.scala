@@ -340,6 +340,14 @@ object GenVexChip {
     binary.getAbsolutePath
   }
 
+  def makeCoreMarkPerf(): String = {
+    val baseDir = "./software/coremark/riscv-coremark/perf"
+    val binary = new File(s"$baseDir/../../overlay/coremark.perf.bin")
+    val make = s"make -C $baseDir"
+    require(make.! == 0 && binary.exists(), "Failed to build coremark!")
+    binary.getAbsolutePath
+  }
+
   def makeTests(force: Boolean = true): String = {
     val baseDir = "./software/tests"
     val binary = new File(s"$baseDir/start.rv32.img")

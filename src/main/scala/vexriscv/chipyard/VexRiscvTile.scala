@@ -298,7 +298,7 @@ class VexRiscvTileModuleImp(outer: VexRiscvTile) extends BaseTileModuleImp(outer
   core.io.reset := reset.asBool
 
   // TODO: connect JTAG
-  core.io.debugReset := reset.asBool
+  // core.io.debugReset := reset.asBool
   // val jtagBundle = BundleBridgeSink[VexJTAGChipIO](Some(() => new VexJTAGChipIO))
 
   outer.connectVexRiscvInterrupts(core.io.softwareInterrupt, core.io.timerInterrupt, core.io.externalInterrupt)

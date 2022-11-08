@@ -16,7 +16,7 @@ import chisel3._
 import chisel3.util._
 import freechips.rocketchip.amba.axi4.AXI4Bundle
 import vexriscv.chipyard.VexCoreBase.processFileContent
-import vexriscv.demo.{GenVexOnChip, VexAxiJTAGConfig, VexAxiJTAGCore}
+import vexriscv.demo.{GenVexOnChip, VexAxiConfig, VexAxiCore}
 
 import java.io.{File, PrintWriter}
 import scala.io.Source
@@ -362,7 +362,7 @@ abstract class VexCoreBase
   if (onChipRAM) {
     GenVexOnChip.run(config, name = moduleName)
   } else {
-    VexAxiJTAGCore.run(VexAxiJTAGConfig.default.copy(
+    VexAxiCore.run(VexAxiConfig.default.copy(
       iCacheSize = config.iCacheSize,
       dCacheSize = config.dCacheSize,
       hardwareBreakpointCount = config.hardwareBreakpointCount,

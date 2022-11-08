@@ -17,7 +17,7 @@ import chisel3.util._
 import freechips.rocketchip.amba.axi4.AXI4Bundle
 import spinal.core.SpinalConfig
 import vexriscv.demo.smp.VexRiscvSmpGen
-import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAxiJTAGConfig, VexAxiJTAGCore, VexInterfaceConfig, VexOnChip, VexOnChipConfig}
+import vexriscv.demo.{GenVexOnChip, VexAXIConfig, VexAxiConfig, VexAxiCore, VexInterfaceConfig, VexOnChip, VexOnChipConfig}
 // import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreSmpUse}
 import vexriscv.demo.{VexAXIConfig, VexAXICore => VexCoreSmpUse}
 
