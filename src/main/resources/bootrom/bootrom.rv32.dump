@@ -5,59 +5,68 @@ bootrom.rv32.elf:     file format elf32-littleriscv
 Disassembly of section .start:
 
 00010000 <_start>:
-   10000:	f1402573          	csrr	a0,mhartid
-   10004:	0a051263          	bnez	a0,100a8 <_dtb>
-   10008:	54000537          	lui	a0,0x54000
-   1000c:	00000593          	li	a1,0
-   10010:	00b52823          	sw	a1,16(a0) # 54000010 <__bss_end+0x53feef50>
-   10014:	00100593          	li	a1,1
-   10018:	00b52423          	sw	a1,8(a0)
-   1001c:	00100593          	li	a1,1
-   10020:	00b52623          	sw	a1,12(a0)
-   10024:	04200993          	li	s3,66
-   10028:	01352023          	sw	s3,0(a0)
-   1002c:	03c0006f          	j	10068 <start_copy>
+   10000:	80700337          	lui	t1,0x80700
+   10004:	00032023          	sw	zero,0(t1) # 80700000 <__bss_end+0x806eef00>
+   10008:	0000500f          	0x500f
+   1000c:	f1402573          	csrr	a0,mhartid
+   10010:	0a051863          	bnez	a0,100c0 <_dtb>
+   10014:	54000ab7          	lui	s5,0x54000
+   10018:	00000593          	li	a1,0
+   1001c:	00baa823          	sw	a1,16(s5) # 54000010 <__bss_end+0x53feef10>
+   10020:	00100593          	li	a1,1
+   10024:	00baa423          	sw	a1,8(s5)
+   10028:	00100593          	li	a1,1
+   1002c:	00baa623          	sw	a1,12(s5)
+   10030:	04200993          	li	s3,66
+   10034:	013aa023          	sw	s3,0(s5)
+   10038:	0480006f          	j	10080 <start_copy>
 
-00010030 <_copy_flash>:
-   10030:	201005b7          	lui	a1,0x20100
-   10034:	80000637          	lui	a2,0x80000
-   10038:	000406b7          	lui	a3,0x40
-   1003c:	ffc68693          	addi	a3,a3,-4 # 3fffc <__bss_end+0x2ef3c>
+0001003c <_copy_flash>:
+   1003c:	201005b7          	lui	a1,0x20100
+   10040:	80000637          	lui	a2,0x80000
+   10044:	000406b7          	lui	a3,0x40
+   10048:	ffc68693          	addi	a3,a3,-4 # 3fffc <__bss_end+0x2eefc>
 
-00010040 <_copy_flash_loop>:
-   10040:	0005a283          	lw	t0,0(a1) # 20100000 <__bss_end+0x200eef40>
-   10044:	00562023          	sw	t0,0(a2) # 80000000 <__bss_end+0x7ffeef40>
-   10048:	00458593          	addi	a1,a1,4
-   1004c:	00460613          	addi	a2,a2,4
-   10050:	ffc68693          	addi	a3,a3,-4
-   10054:	0155f933          	and	s2,a1,s5
-   10058:	01249463          	bne	s1,s2,10060 <skip_dot>
-   1005c:	013a2023          	sw	s3,0(s4)
+0001004c <_copy_flash_loop>:
+   1004c:	0005a283          	lw	t0,0(a1) # 20100000 <__bss_end+0x200eef00>
+   10050:	00562023          	sw	t0,0(a2) # 80000000 <__bss_end+0x7ffeef00>
+   10054:	00458593          	addi	a1,a1,4
+   10058:	00460613          	addi	a2,a2,4
+   1005c:	ffc68693          	addi	a3,a3,-4
+   10060:	0155f933          	and	s2,a1,s5
+   10064:	01249463          	bne	s1,s2,1006c <skip_dot>
+   10068:	013a2023          	sw	s3,0(s4)
 
-00010060 <skip_dot>:
-   10060:	fe0690e3          	bnez	a3,10040 <_copy_flash_loop>
-   10064:	00008067          	ret
+0001006c <skip_dot>:
+   1006c:	fe0690e3          	bnez	a3,1004c <_copy_flash_loop>
+   10070:	80700337          	lui	t1,0x80700
+   10074:	00632023          	sw	t1,0(t1) # 80700000 <__bss_end+0x806eef00>
+   10078:	0000500f          	0x500f
+   1007c:	00008067          	ret
 
-00010068 <start_copy>:
-   10068:	000084b7          	lui	s1,0x8
-   1006c:	54000a37          	lui	s4,0x54000
-   10070:	00010ab7          	lui	s5,0x10
-   10074:	fffa8a93          	addi	s5,s5,-1 # ffff <__STACKSIZE__+0xefff>
-   10078:	fb9ff0ef          	jal	ra,10030 <_copy_flash>
-   1007c:	04400593          	li	a1,68
-   10080:	00b52023          	sw	a1,0(a0)
-   10084:	00004537          	lui	a0,0x4
-   10088:	00052503          	lw	a0,0(a0) # 4000 <__STACKSIZE__+0x3000>
-   1008c:	34151073          	csrw	mepc,a0
-   10090:	f1402573          	csrr	a0,mhartid
-   10094:	00000597          	auipc	a1,0x0
-   10098:	01458593          	addi	a1,a1,20 # 100a8 <_dtb>
-   1009c:	08000613          	li	a2,128
-   100a0:	30063073          	csrc	mstatus,a2
-   100a4:	30200073          	mret
+00010080 <start_copy>:
+   10080:	000084b7          	lui	s1,0x8
+   10084:	02e00993          	li	s3,46
+   10088:	00010ab7          	lui	s5,0x10
+   1008c:	fffa8a93          	addi	s5,s5,-1 # ffff <__STACKSIZE__+0xefff>
+   10090:	fadff0ef          	jal	ra,1003c <_copy_flash>
 
-000100a8 <_dtb>:
-   100a8:	10500073          	wfi
-   100ac:	ffdff06f          	j	100a8 <_dtb>
-   100b0:	0000                	unimp
-	...
+00010094 <copy_done>:
+   10094:	04400593          	li	a1,68
+   10098:	00baa023          	sw	a1,0(s5)
+   1009c:	00004537          	lui	a0,0x4
+   100a0:	00052503          	lw	a0,0(a0) # 4000 <__STACKSIZE__+0x3000>
+   100a4:	34151073          	csrw	mepc,a0
+   100a8:	f1402573          	csrr	a0,mhartid
+   100ac:	00000597          	auipc	a1,0x0
+   100b0:	01458593          	addi	a1,a1,20 # 100c0 <_dtb>
+   100b4:	08000613          	li	a2,128
+   100b8:	30063073          	csrc	mstatus,a2
+   100bc:	30200073          	mret
+
+000100c0 <_dtb>:
+   100c0:	80700337          	lui	t1,0x80700
+   100c4:	0000500f          	0x500f
+   100c8:	00032283          	lw	t0,0(t1) # 80700000 <__bss_end+0x806eef00>
+   100cc:	fe028ae3          	beqz	t0,100c0 <_dtb>
+   100d0:	fc5ff06f          	j	10094 <copy_done>

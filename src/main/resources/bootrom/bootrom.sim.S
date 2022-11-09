@@ -3,19 +3,22 @@
 .section .start, "ax", @progbits
 .global _start
 _start:
+	// for sifive uart
+  li s5,0x54000000
+	li t1,FLASH_DONE
+	sw zero,0(t1)
+	sync
 	csrr a0, mhartid                  # read current hart id
   bnez a0, park                     # if we're not on the hart 0
-  // for sifive uart
-  li a0,0x54000000
 	// disable interrupts
 	li a1,0
-	sw a1,16(a0)
+	sw a1,16(s5)
 	// enable tx
 	li a1,1
-	sw a1,8(a0)
+	sw a1,8(s5)
 	// enable rx
 	li a1,1
-	sw a1,12(a0)
+	sw a1,12(s5)
 
 	// print START\n
 	addi a1,zero,'S'
@@ -24,12 +27,12 @@ _start:
 	addi a4,zero,'R'
 	addi a5,zero,'T'
 	addi a6,zero,'\n'
-  sw a1,0(a0)
-	sw a2,0(a0)
-	sw a3,0(a0)
-	sw a4,0(a0)
-	sw a5,0(a0)
-	sw a6,0(a0)
+  sw a1,0(s5)
+	sw a2,0(s5)
+	sw a3,0(s5)
+	sw a4,0(s5)
+	sw a5,0(s5)
+	sw a6,0(s5)
 	j start_copy
 
 // this boot ROM doesn't know about any boot devices, so it just spins,
@@ -49,6 +52,13 @@ _hang: // reset vector
   csrw mie, a0           // set only MSIP in MIE CSR
   csrs mstatus, a0       // set MIE in mstatus CSR
 
+	li s5,0x54000000
+	li t1,FLASH_DONE
+	sw zero,0(t1)
+	sync
+	csrr a0, mhartid                  # read current hart id
+  bnez a0, park                     # if we're not on the hart 0
+
 wfi_loop: // wait for MSIP interrupt to start program execution
   wfi
   j wfi_loop
@@ -61,52 +71,59 @@ _copy_flash:
 	// program_size
 	# li a3, (15*0x400*0x400)
 	li a3, ((40 * 0x400) - 4) // set to 40kb
+	# li a3, 4 // use ddr loader
 _copy_flash_loop:
 	lw t0, 0(a1)
 	sw t0, 0(a2)
 	addi a1, a1, 4
 	addi a2, a2, 4
 	addi a3, a3, -4
-	and s2, a1, s5
+	and s2, a1, s6
 	bne s1, s2, skip_dot # if s1 == s2 then skip_dot
-	sw s3,0(s4)
+	sw s3,0(s5)
 skip_dot:
 	bnez a3, _copy_flash_loop
+	li t1,FLASH_DONE
+	sw t1,0(t1)
+	sync
 	ret
 
 start_copy:
 	li s1, (32 * 0x400)
 	li s3, '.'
-	lui s4,0x54000000>>12
-	li s5, 0xffff
+	li s6, 0xffff
   jal _copy_flash
 
-  // for sifive uart
-  li a0,0x54000000
-	// disable interrupts
-	li a1,0
-	sw a1,16(a0)
-	// enable tx
-	li a1,1
-	sw a1,8(a0)
-	// enable rx
-	li a1,1
-	sw a1,12(a0)
-
-	// print START\n
-	addi a1,zero,'C'
+copy_done:
+	csrr a0, mhartid
+	bnez a0, attach
+  addi a1,zero,'C'
 	addi a2,zero,'O'
 	addi a3,zero,'P'
 	addi a4,zero,'Y'
 	addi a5,zero,'.'
 	addi a6,zero,'\n'
-  sw a1,0(a0)
-	sw a2,0(a0)
-	sw a3,0(a0)
-	sw a4,0(a0)
-	sw a5,0(a0)
-	sw a6,0(a0)
-
+  sw a1,0(s5)
+	sw a2,0(s5)
+	sw a3,0(s5)
+	sw a4,0(s5)
+	sw a5,0(s5)
+	sw a6,0(s5)
+	j attach_done
+attach:
+	addi a1,zero,'A'
+	addi a2,zero,'T'
+	addi a3,zero,'A'
+	addi a4,zero,'C'
+	addi a5,zero,'H'
+	addi a6,zero,'\n'
+  sw a1,0(s5)
+	sw a2,0(s5)
+	sw a3,0(s5)
+	sw a4,0(s5)
+	sw a5,0(s5)
+	sw a6,0(s5)
+attach_done:
   li a0, BOOTADDR_REG
   lw a0, 0(a0)
   csrw mepc, a0       // return from interrupt to start of user program
@@ -120,5 +137,8 @@ start_copy:
 _dtb:
 
 park:
-	wfi
-	j park
+	li t1,FLASH_DONE
+	sync
+	lw t0,0(t1)
+	beqz t0,park
+	j copy_done

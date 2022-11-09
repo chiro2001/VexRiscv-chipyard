@@ -3,23 +3,26 @@
 .section .start, "ax", @progbits
 .global _start
 _start:
+	li t1,FLASH_DONE
+	sw zero,0(t1)
+	sync
 	csrr a0, mhartid                  # read current hart id
   bnez a0, park                     # if we're not on the hart 0
   // for sifive uart
-  li a0,0x54000000
+  li s5,0x54000000
 	// disable interrupts
 	li a1,0
-	sw a1,16(a0)
+	sw a1,16(s5)
 	// enable tx
 	li a1,1
-	sw a1,8(a0)
+	sw a1,8(s5)
 	// enable rx
 	li a1,1
-	sw a1,12(a0)
+	sw a1,12(s5)
 
 	// print B
 	addi s3,zero,'B'
-	sw s3,0(a0)
+	sw s3,0(s5)
 	j start_copy
 
 _copy_flash:
@@ -41,18 +44,21 @@ _copy_flash_loop:
 	sw s3,0(s4)
 skip_dot:
 	bnez a3, _copy_flash_loop
+	li t1,FLASH_DONE
+	sw t1,0(t1)
+	sync
 	ret
 
 start_copy:
 	li s1, (32 * 0x400)
-	# li s3, '.'
-	lui s4,0x54000000>>12
+	li s3, '.'
 	li s5, 0xffff
   jal _copy_flash
 
+copy_done:
 	// print D
 	addi a1,zero,'D'
-	sw a1,0(a0)
+	sw a1,0(s5)
 
   li a0, BOOTADDR_REG
   lw a0, 0(a0)
@@ -67,5 +73,8 @@ start_copy:
 _dtb:
 
 park:
-	wfi
-	j park
+	li t1,FLASH_DONE
+	sync
+	lw t0,0(t1)
+	beqz t0,park
+	j copy_done

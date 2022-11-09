@@ -6,5 +6,7 @@
 #define DDR_ADDR 0x80000000
 #define FLASH_SIZE (16 * 1024 * 1024) // 16 MiB
 #define __STACKSIZE__ 0x1000
+#define FLASH_DONE 0x80700000
+#define sync .word 0x500f
 
 #endif
