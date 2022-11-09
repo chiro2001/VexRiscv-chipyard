@@ -137,6 +137,10 @@ attach_done:
 _dtb:
 
 park:
+	li t2, 0x3f
+pack_loop:
+	addi t2, t2, -1
+	bnez t2, pack_loop
 	li t1,FLASH_DONE
 	sync
 	lw t0,0(t1)

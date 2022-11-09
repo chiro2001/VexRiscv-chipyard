@@ -3,13 +3,13 @@
 .section .start, "ax", @progbits
 .global _start
 _start:
+	// for sifive uart
+  li s5,0x54000000
 	li t1,FLASH_DONE
 	sw zero,0(t1)
 	sync
 	csrr a0, mhartid                  # read current hart id
   bnez a0, park                     # if we're not on the hart 0
-  // for sifive uart
-  li s5,0x54000000
 	// disable interrupts
 	li a1,0
 	sw a1,16(s5)
@@ -39,10 +39,6 @@ _copy_flash_loop:
 	addi a1, a1, 4
 	addi a2, a2, 4
 	addi a3, a3, -4
-	and s2, a1, s6
-	bne s1, s2, skip_dot # if s1 == s2 then skip_dot
-	sw s3,0(s5)
-skip_dot:
 	bnez a3, _copy_flash_loop
 	li t1,FLASH_DONE
 	sw t1,0(t1)
@@ -50,10 +46,7 @@ skip_dot:
 	ret
 
 start_copy:
-	li s1, (32 * 0x400)
-	li s3, '.'
-	li s6, 0xffff
-  jal _copy_flash
+	jal _copy_flash
 
 copy_done:
 	// print D

@@ -131,10 +131,13 @@ Disassembly of section .text.hang:
    101b4:	00000013          	nop
 
 000101b8 <_dtb>:
-   101b8:	80700337          	lui	t1,0x80700
-   101bc:	0000500f          	0x500f
-   101c0:	00032283          	lw	t0,0(t1) # 80700000 <__bss_end+0x806eee00>
-   101c4:	fe028ae3          	beqz	t0,101b8 <_dtb>
-   101c8:	f5dff06f          	j	10124 <copy_done>
-   101cc:	0000                	unimp
-	...
+   101b8:	03f00393          	li	t2,63
+
+000101bc <pack_loop>:
+   101bc:	fff38393          	addi	t2,t2,-1
+   101c0:	fe039ee3          	bnez	t2,101bc <pack_loop>
+   101c4:	80700337          	lui	t1,0x80700
+   101c8:	0000500f          	0x500f
+   101cc:	00032283          	lw	t0,0(t1) # 80700000 <__bss_end+0x806eee00>
+   101d0:	fe0284e3          	beqz	t0,101b8 <_dtb>
+   101d4:	f51ff06f          	j	10124 <copy_done>
