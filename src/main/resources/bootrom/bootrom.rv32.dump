@@ -33,9 +33,9 @@ Disassembly of section .start:
    10054:	00458593          	addi	a1,a1,4
    10058:	00460613          	addi	a2,a2,4
    1005c:	ffc68693          	addi	a3,a3,-4
-   10060:	0155f933          	and	s2,a1,s5
+   10060:	0165f933          	and	s2,a1,s6
    10064:	01249463          	bne	s1,s2,1006c <skip_dot>
-   10068:	013a2023          	sw	s3,0(s4)
+   10068:	013aa023          	sw	s3,0(s5)
 
 0001006c <skip_dot>:
    1006c:	fe0690e3          	bnez	a3,1004c <_copy_flash_loop>
@@ -47,8 +47,8 @@ Disassembly of section .start:
 00010080 <start_copy>:
    10080:	000084b7          	lui	s1,0x8
    10084:	02e00993          	li	s3,46
-   10088:	00010ab7          	lui	s5,0x10
-   1008c:	fffa8a93          	addi	s5,s5,-1 # ffff <__STACKSIZE__+0xefff>
+   10088:	00010b37          	lui	s6,0x10
+   1008c:	fffb0b13          	addi	s6,s6,-1 # ffff <__STACKSIZE__+0xefff>
    10090:	fadff0ef          	jal	ra,1003c <_copy_flash>
 
 00010094 <copy_done>:

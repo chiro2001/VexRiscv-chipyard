@@ -39,9 +39,9 @@ _copy_flash_loop:
 	addi a1, a1, 4
 	addi a2, a2, 4
 	addi a3, a3, -4
-	and s2, a1, s5
+	and s2, a1, s6
 	bne s1, s2, skip_dot # if s1 == s2 then skip_dot
-	sw s3,0(s4)
+	sw s3,0(s5)
 skip_dot:
 	bnez a3, _copy_flash_loop
 	li t1,FLASH_DONE
@@ -52,7 +52,7 @@ skip_dot:
 start_copy:
 	li s1, (32 * 0x400)
 	li s3, '.'
-	li s5, 0xffff
+	li s6, 0xffff
   jal _copy_flash
 
 copy_done:

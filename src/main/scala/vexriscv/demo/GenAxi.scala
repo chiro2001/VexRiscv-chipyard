@@ -20,7 +20,7 @@ case class VexAxiConfig
  dCacheSize: Int = 4096,
  hardwareBreakpointCount: Int = 3,
  name: String = "VexCore",
- freq: HertzNumber = 5 MHz,
+ freq: HertzNumber = 50 MHz,
  resetVector: BigInt = vexriscv.demo.VexDefaultConfig.resetVector)
 
 object VexAxiConfig {

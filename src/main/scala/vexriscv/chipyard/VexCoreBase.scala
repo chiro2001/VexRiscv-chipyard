@@ -395,6 +395,7 @@ abstract class VexCoreBase
       resetVector = config.resetVector,
       hartId = hartId,
       debug = config.debug,
+      freq = config.freq,
       name = moduleName
     ))
   }

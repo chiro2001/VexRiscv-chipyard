@@ -22,6 +22,7 @@ case class VexOnChipConfig
  replaceMemoryIP: Boolean = false,
  resetVector: BigInt = VexDefaultConfig.resetVector,
  debug: Boolean = false,
+ freq: HertzNumber = 50 MHz,
  cpuPlugins: ArrayBuffer[Plugin[VexRiscv]] = VexOnChipConfig.defaultPlugins(bigEndian = false)) {
 }
 // object VexOnChipConfig {
